@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="لوحة تحكم مالية شخصية لإدارة التدفق النقدي الشهري، البنوك، الالتزامات، المصروفات، والتحويلات." />
+  <meta name="theme-color" content="#08111f" />
+  <title>لوحة التحكم المالية الشخصية</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="appShell" class="app-shell">
+    <aside class="side-panel" aria-label="القائمة الرئيسية">
+      <div class="brand-block">
+        <div class="brand-mark">ب</div>
+        <div>
+          <p class="eyebrow">Cashflow Control</p>
+          <h1>لوحة التحكم المالية</h1>
+        </div>
+      </div>
+
+      <nav class="main-nav" aria-label="أقسام الموقع">
+        <button class="nav-link is-active" data-target="dashboardSection">لوحة التحكم</button>
+        <button class="nav-link" data-target="banksSection">حركة البنوك</button>
+        <button class="nav-link" data-target="categoriesSection">التصنيفات</button>
+        <button class="nav-link" data-target="transactionsSection">الحركات</button>
+        <button class="nav-link" data-target="analyticsSection">التحليلات</button>
+        <button class="nav-link" data-target="timelineSection">المسار الزمني</button>
+      </nav>
+
+      <div class="side-card">
+        <span class="side-card-label">المتبقي النهائي المتوقع</span>
+        <strong id="sideExpectedRemaining">0.000 JOD</strong>
+        <small>يُحسب من الرصيد الافتتاحي + الدخل + التعويضات - المصروفات الحقيقية.</small>
+      </div>
+
+      <div class="save-status" id="saveStatus">
+        <span class="save-dot"></span>
+        <span>محفوظ محلياً</span>
+      </div>
+    </aside>
+
+    <main class="main-panel">
+      <header class="topbar">
+        <div class="topbar-title">
+          <p class="eyebrow">نظام تدفق نقدي شخصي</p>
+          <h2>إدارة توزيع الراتب والبنوك والالتزامات</h2>
+          <p class="topbar-subtitle">المتبقي النهائي: <strong id="heroFinalBalance">0.000 JOD</strong></p>
+        </div>
+
+        <div class="topbar-actions">
+          <label class="field compact-field">
+            <span>الشهر</span>
+            <input id="monthSelector" type="month" aria-label="اختيار الشهر" />
+          </label>
+
+          <button id="duplicateMonthBtn" class="btn btn-soft" type="button">نسخ للشهر القادم</button>
+          <button id="openTransactionBtn" class="btn btn-primary" type="button">إضافة حركة</button>
+        </div>
+      </header>
+
+      <section class="control-strip" aria-label="إعدادات سريعة">
+        <label class="field">
+          <span>رصيد الراجحي الافتتاحي</span>
+          <input class="opening-input" data-bank="alrajhi" type="number" step="0.001" inputmode="decimal" />
+        </label>
+
+        <label class="field">
+          <span>رصيد العربي الافتتاحي</span>
+          <input class="opening-input" data-bank="arab" type="number" step="0.001" inputmode="decimal" />
+        </label>
+
+        <label class="field">
+          <span>رصيد المحفظة النقدية</span>
+          <input class="opening-input" data-bank="cash" type="number" step="0.001" inputmode="decimal" />
+        </label>
+
+        <label class="field">
+          <span>لون الموقع الرئيسي</span>
+          <input id="accentPicker" type="color" value="#099999" />
+        </label>
+
+        <div class="toggle-row">
+          <button id="themeToggleBtn" class="btn btn-soft" type="button">الوضع الفاتح</button>
+          <button id="onboardingBtn" class="btn btn-ghost" type="button">شرح سريع</button>
+        </div>
+      </section>
+
+      <section id="dashboardSection" class="page-section">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Monthly Dashboard</p>
+            <h3>لوحة التحكم المالية</h3>
+          </div>
+          <div class="health-pill" id="healthPill">Score 0</div>
+        </div>
+
+        <div id="dashboardCards" class="kpi-grid"></div>
+
+        <div class="dashboard-layout">
+          <article class="panel-card flow-panel">
+            <div class="card-head">
+              <div>
+                <p class="eyebrow">Visual Financial Map</p>
+                <h4>مسار الراتب</h4>
+              </div>
+              <span class="mini-badge">Salary → Banks → Expenses</span>
+            </div>
+            <div id="moneyFlow" class="money-flow"></div>
+          </article>
+
+          <article class="panel-card">
+            <div class="card-head">
+              <div>
+                <p class="eyebrow">Smart Summary</p>
+                <h4>ملخص التدفق النقدي</h4>
+              </div>
+            </div>
+            <div id="smartSummary" class="smart-summary"></div>
+          </article>
+        </div>
+
+        <div class="insight-grid">
+          <article class="insight-card">
+            <span>ما تبقى غير مدفوع؟</span>
+            <strong id="unpaidCard">0.000 JOD</strong>
+            <small id="unpaidCount">0 حركات</small>
+          </article>
+          <article class="insight-card">
+            <span>أكبر التزامات متبقية</span>
+            <div id="largestRemainingCard" class="mini-list"></div>
+          </article>
+          <article class="insight-card">
+            <span>إجراءات اليوم</span>
+            <div id="todayActionsCard" class="mini-list"></div>
+          </article>
+          <article class="insight-card">
+            <span>تنبيهات مالية</span>
+            <div id="warningsCard" class="mini-list"></div>
+          </article>
+        </div>
+      </section>
+
+      <section id="banksSection" class="page-section">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Bank Movement Tracker</p>
+            <h3>حركة البنوك</h3>
+          </div>
+        </div>
+
+        <div id="bankCards" class="bank-grid"></div>
+      </section>
+
+      <section id="categoriesSection" class="page-section">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Expense Category Management</p>
+            <h3>تصنيفات المصروفات</h3>
+          </div>
+        </div>
+
+        <div id="categoryCards" class="category-stack"></div>
+      </section>
+
+      <section id="transactionsSection" class="page-section">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Transaction Checklist</p>
+            <h3>قائمة الحركات المالية</h3>
+          </div>
+          <div class="header-actions">
+            <button id="exportJsonBtn" class="btn btn-soft" type="button">نسخة JSON</button>
+            <button id="importJsonBtn" class="btn btn-soft" type="button">استيراد JSON</button>
+            <button id="exportCsvBtn" class="btn btn-soft" type="button">تصدير Excel</button>
+            <button id="printReportBtn" class="btn btn-soft" type="button">طباعة التقرير</button>
+            <button id="resetMonthBtn" class="btn btn-danger" type="button">تصفير الشهر</button>
+          </div>
+        </div>
+
+        <div class="filter-bar">
+          <label class="field">
+            <span>بحث</span>
+            <input id="searchInput" type="search" placeholder="ابحث باسم الحركة أو الملاحظة..." />
+          </label>
+
+          <label class="field">
+            <span>الحالة</span>
+            <select id="statusFilter">
+              <option value="all">كل الحالات</option>
+              <option value="Pending">معلقة</option>
+              <option value="Completed">مكتملة</option>
+              <option value="Delayed">متأخرة</option>
+              <option value="Skipped">متجاوزة</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>البنك</span>
+            <select id="bankFilter">
+              <option value="all">كل البنوك</option>
+              <option value="alrajhi">مصرف الراجحي</option>
+              <option value="arab">البنك العربي</option>
+              <option value="cash">محفظة نقدية</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>الترتيب</span>
+            <select id="sortSelect">
+              <option value="dateAsc">التاريخ تصاعدي</option>
+              <option value="dateDesc">التاريخ تنازلي</option>
+              <option value="amountDesc">المبلغ الأعلى</option>
+              <option value="amountAsc">المبلغ الأقل</option>
+              <option value="categoryAsc">التصنيف</option>
+              <option value="statusAsc">الحالة</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="table-wrap">
+          <table class="transactions-table">
+            <thead>
+              <tr>
+                <th>الحالة</th>
+                <th>الحركة</th>
+                <th>النوع</th>
+                <th>البنك</th>
+                <th>التصنيف</th>
+                <th>المبلغ</th>
+                <th>التاريخ المخطط</th>
+                <th>الرصيد قبل</th>
+                <th>الرصيد بعد</th>
+                <th>إجراء</th>
+              </tr>
+            </thead>
+            <tbody id="transactionsTableBody"></tbody>
+          </table>
+        </div>
+
+        <div id="transactionCards" class="mobile-transaction-list"></div>
+      </section>
+
+      <section id="analyticsSection" class="page-section">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Charts & Analytics</p>
+            <h3>التحليلات والرسوم</h3>
+          </div>
+        </div>
+
+        <div class="analytics-grid">
+          <article class="panel-card">
+            <div class="card-head">
+              <h4>المصروفات حسب التصنيف</h4>
+            </div>
+            <div id="categoryChart" class="bar-chart"></div>
+          </article>
+
+          <article class="panel-card">
+            <div class="card-head">
+              <h4>المكتمل مقابل المعلق</h4>
+            </div>
+            <div id="statusChart" class="donut-wrap"></div>
+          </article>
+
+          <article class="panel-card">
+            <div class="card-head">
+              <h4>حركة أرصدة البنوك</h4>
+            </div>
+            <div id="balanceChart" class="line-chart-wrap"></div>
+          </article>
+
+          <article class="panel-card">
+            <div class="card-head">
+              <h4>أكبر 5 دفعات</h4>
+            </div>
+            <div id="topPaymentsChart" class="bar-chart"></div>
+          </article>
+
+          <article class="panel-card">
+            <div class="card-head">
+              <h4>الدخل مقابل المصروفات</h4>
+            </div>
+            <div id="incomeExpenseChart" class="comparison-chart"></div>
+          </article>
+
+          <article class="panel-card">
+            <div class="card-head">
+              <h4>التحويلات مقابل المصروفات الحقيقية</h4>
+            </div>
+            <div id="transferExpenseChart" class="comparison-chart"></div>
+          </article>
+        </div>
+      </section>
+
+      <section id="timelineSection" class="page-section">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Smart Balance Timeline</p>
+            <h3>المسار الزمني للأرصدة</h3>
+          </div>
+        </div>
+
+        <div id="timelineList" class="timeline-list"></div>
+      </section>
+
+      <section class="closing-checklist panel-card">
+        <div class="card-head">
+          <div>
+            <p class="eyebrow">Monthly Closing Checklist</p>
+            <h4>قائمة إغلاق الشهر</h4>
+          </div>
+        </div>
+        <div id="closingChecklist" class="checklist-grid"></div>
+      </section>
+    </main>
+  </div>
+
+  <button id="quickAddFab" class="fab" type="button" aria-label="إضافة حركة مالية">+</button>
+
+  <input id="jsonImportInput" type="file" accept="application/json" hidden />
+
+  <dialog id="transactionDialog" class="modal">
+    <form id="transactionForm" method="dialog" class="modal-card">
+      <div class="modal-head">
+        <div>
+          <p class="eyebrow">Transaction Editor</p>
+          <h3 id="transactionDialogTitle">إضافة حركة مالية</h3>
+        </div>
+        <button class="icon-btn" type="button" data-close-dialog="transactionDialog" aria-label="إغلاق">×</button>
+      </div>
+
+      <input id="transactionId" type="hidden" />
+
+      <div class="form-grid">
+        <label class="field span-2">
+          <span>اسم الحركة</span>
+          <input id="txName" type="text" required />
+        </label>
+
+        <label class="field">
+          <span>المبلغ</span>
+          <input id="txAmount" type="number" step="0.001" inputmode="decimal" required />
+        </label>
+
+        <label class="field">
+          <span>النوع</span>
+          <select id="txType" required>
+            <option value="Income">دخل</option>
+            <option value="Expense">مصروف</option>
+            <option value="Transfer">تحويل داخلي</option>
+            <option value="Deduction">اقتطاع</option>
+            <option value="Reimbursement">تعويض</option>
+            <option value="DebtRepayment">سداد دين</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>من حساب</span>
+          <select id="txBank" required>
+            <option value="alrajhi">مصرف الراجحي</option>
+            <option value="arab">البنك العربي</option>
+            <option value="cash">محفظة نقدية</option>
+          </select>
+        </label>
+
+        <label id="toBankField" class="field">
+          <span>إلى حساب</span>
+          <select id="txToBank">
+            <option value="arab">البنك العربي</option>
+            <option value="alrajhi">مصرف الراجحي</option>
+            <option value="cash">محفظة نقدية</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>التصنيف</span>
+          <select id="txCategory"></select>
+        </label>
+
+        <label class="field">
+          <span>التاريخ المخطط</span>
+          <input id="txPlannedDate" type="date" required />
+        </label>
+
+        <label class="field">
+          <span>التاريخ الفعلي</span>
+          <input id="txActualDate" type="date" />
+        </label>
+
+        <label class="field">
+          <span>الحالة</span>
+          <select id="txStatus" required>
+            <option value="Pending">معلقة</option>
+            <option value="Completed">مكتملة</option>
+            <option value="Delayed">متأخرة</option>
+            <option value="Skipped">متجاوزة</option>
+          </select>
+        </label>
+
+        <label class="field span-2">
+          <span>ملاحظات</span>
+          <textarea id="txNotes" rows="3"></textarea>
+        </label>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-ghost" type="button" data-close-dialog="transactionDialog">إلغاء</button>
+        <button id="deleteTransactionBtn" class="btn btn-danger" type="button">حذف</button>
+        <button class="btn btn-primary" type="submit">حفظ الحركة</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="confirmDialog" class="modal">
+    <form method="dialog" class="modal-card compact-modal">
+      <div class="modal-head">
+        <div>
+          <p class="eyebrow">Confirm</p>
+          <h3 id="confirmTitle">تأكيد الإجراء</h3>
+        </div>
+      </div>
+      <p id="confirmMessage" class="confirm-message"></p>
+      <div class="confirm-input-wrap" id="confirmInputWrap">
+        <label class="field">
+          <span>اكتب RESET للتأكيد</span>
+          <input id="confirmInput" type="text" autocomplete="off" />
+        </label>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" value="cancel" type="submit">إلغاء</button>
+        <button id="confirmOkBtn" class="btn btn-danger" value="ok" type="submit">تأكيد</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="onboardingDialog" class="modal">
+    <div class="modal-card onboarding-card">
+      <div class="modal-head">
+        <div>
+          <p class="eyebrow">Welcome</p>
+          <h3>طريقة استخدام النظام</h3>
+        </div>
+        <button class="icon-btn" type="button" data-close-dialog="onboardingDialog" aria-label="إغلاق">×</button>
+      </div>
+      <div class="onboarding-grid">
+        <div>
+          <strong>1. أدخل الرصيد الافتتاحي</strong>
+          <span>حدد رصيد الراجحي والعربي وأي محفظة نقدية قبل بداية الشهر.</span>
+        </div>
+        <div>
+          <strong>2. تابع الحركات</strong>
+          <span>كل حركة لها حالة. عند الدفع أو التحويل اختر مكتملة.</span>
+        </div>
+        <div>
+          <strong>3. راقب الفرق</strong>
+          <span>النظام يفصل المصروف الحقيقي عن التحويل الداخلي حتى لا تتكرر الأرقام.</span>
+        </div>
+        <div>
+          <strong>4. أغلق الشهر</strong>
+          <span>راجع المتأخرات، صدّر التقرير، ثم انسخ الخطة للشهر القادم.</span>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button id="finishOnboardingBtn" class="btn btn-primary" type="button">فهمت</button>
+      </div>
+    </div>
+  </dialog>
+
+  <div id="toastHost" class="toast-host" aria-live="polite"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
