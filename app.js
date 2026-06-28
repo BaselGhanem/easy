@@ -1,781 +1,448 @@
 (() => {
   "use strict";
 
-  const STORAGE_KEY = "premium_cashflow_tracker_v1";
-  const ACTIVE_VERSION = "20260628_finance_cashflow_v1";
+  const STORE = "cashflow_simple_v2";
+  const DEFAULT_MONTH = new Date().toISOString().slice(0, 7);
 
   const BANKS = {
-    alrajhi: { id: "alrajhi", name: "مصرف الراجحي", shortName: "الراجحي" },
-    arab: { id: "arab", name: "البنك العربي", shortName: "العربي" },
-    cash: { id: "cash", name: "محفظة نقدية", shortName: "نقدي" }
+    alrajhi: "الراجحي",
+    arab: "العربي",
+    cash: "نقدي"
   };
 
-  const CATEGORY_DEFS = [
-    { id: "income", name: "مصادر الدخل", kind: "income" },
-    { id: "salaryDeduction", name: "اقتطاعات الراتب", kind: "deduction" },
-    { id: "banking", name: "التزامات بنكية / قروض / دفعات", kind: "expense" },
-    { id: "home", name: "المنزل والعقار", kind: "expense" },
-    { id: "bills", name: "فواتير وخدمات", kind: "expense" },
-    { id: "personal", name: "مصروف شخصي / عائلي", kind: "expense" },
-    { id: "debt", name: "تحويلات وسداد ديون", kind: "expense" },
-    { id: "internal", name: "تحويلات داخلية بين البنوك", kind: "transfer" }
-  ];
-
-  const TYPE_LABELS = {
+  const TYPES = {
     Income: "دخل",
     Expense: "مصروف",
-    Transfer: "تحويل داخلي",
+    Transfer: "تحويل",
     Deduction: "اقتطاع",
     Reimbursement: "تعويض",
     DebtRepayment: "سداد دين"
   };
 
-  const STATUS_LABELS = {
-    Pending: "معلقة",
-    Completed: "مكتملة",
-    Delayed: "متأخرة",
-    Skipped: "متجاوزة"
+  const STATUSES = {
+    Pending: "غير مدفوع",
+    Completed: "مدفوع",
+    Delayed: "متأخر",
+    Skipped: "متجاوز"
   };
 
-  const MONTHLY_CLOSING_ITEMS = [
-    "كل مصادر الدخل والتعويضات مكتملة",
-    "لا توجد حركة متأخرة بدون قرار",
-    "الأرصدة الفعلية مطابقة للبنوك",
-    "تم تصدير تقرير الشهر",
-    "تم حفظ نسخة JSON احتياطية",
-    "تمت مراجعة أكبر 5 دفعات",
-    "تم فصل التحويلات عن المصروف الحقيقي",
-    "تم تجهيز خطة الشهر القادم"
+  const CATEGORIES = [
+    { id: "income", name: "مصادر الدخل" },
+    { id: "banking", name: "التزامات بنكية" },
+    { id: "home", name: "المنزل والعقار" },
+    { id: "bills", name: "فواتير وخدمات" },
+    { id: "personal", name: "مصروف شخصي / عائلي" },
+    { id: "debt", name: "تحويلات وسداد ديون" },
+    { id: "internal", name: "تحويلات داخلية" }
   ];
 
-  const DEFAULT_MONTH = new Date().toISOString().slice(0, 7);
+  const DEFAULT_ITEMS = [
+    ["استلام الراتب في الراجحي", 2449.664, "alrajhi", "", "Income", "income", 25, "Salary received in Al Rajhi"],
+    ["اقتطاع قرض السكن", 444.000, "alrajhi", "", "Deduction", "banking", 25, "خصم مباشر من الراجحي"],
+    ["تحويل المتبقي إلى العربي", 2005.664, "alrajhi", "arab", "Transfer", "internal", 25, "تحويل داخلي لا يعتبر مصروف"],
+    ["استلام تعويض قرض السكن", 444.000, "alrajhi", "", "Reimbursement", "income", 25, ""],
+    ["تحويل تعويض قرض السكن إلى العربي", 444.000, "alrajhi", "arab", "Transfer", "internal", 25, ""],
+    ["استلام بدل الإيجار", 421.000, "alrajhi", "", "Reimbursement", "income", 25, ""],
+    ["تحويل بدل الإيجار إلى العربي", 421.000, "alrajhi", "arab", "Transfer", "internal", 25, ""],
+    ["قرض البنك العربي", 435.000, "arab", "", "Expense", "banking", 26, ""],
+    ["دفعة إلى البنك العربي", 1081.188, "arab", "", "Expense", "banking", 26, ""],
+    ["قسط اللابتوب", 21.000, "arab", "", "Expense", "banking", 26, ""],
+    ["البيت", 150.000, "arab", "", "Expense", "home", 26, ""],
+    ["رسوم تحويل البيت", 100.000, "arab", "", "Expense", "home", 26, ""],
+    ["مسقفات / ضريبة عقار", 213.466, "arab", "", "Expense", "home", 26, ""],
+    ["موبايل", 25.000, "arab", "", "Expense", "bills", 26, ""],
+    ["Microsoft", 5.000, "arab", "", "Expense", "bills", 26, ""],
+    ["المصري", 9.000, "arab", "", "Expense", "bills", 26, ""],
+    ["إنترنت", 20.880, "arab", "", "Expense", "bills", 26, ""],
+    ["كهرباء", 36.488, "arab", "", "Expense", "bills", 26, ""],
+    ["كهرباء العائلة", 45.642, "arab", "", "Expense", "bills", 26, ""],
+    ["إنترنت العائلة", 10.000, "arab", "", "Expense", "bills", 26, ""],
+    ["مياه", 5.000, "arab", "", "Expense", "bills", 26, ""],
+    ["Basel", 100.000, "arab", "", "Expense", "personal", 27, ""],
+    ["Areen", 75.000, "arab", "", "Expense", "personal", 27, ""],
+    ["Mall", 100.000, "arab", "", "Expense", "personal", 27, ""],
+    ["وقود", 100.000, "arab", "", "Expense", "personal", 27, ""],
+    ["مخصص عقيقة", 175.000, "arab", "", "Expense", "personal", 27, ""],
+    ["تحويل إلى آرين - سداد دين", 163.000, "arab", "", "DebtRepayment", "debt", 27, ""]
+  ];
 
-  const DEFAULT_TRANSACTIONS = [
-    {
-      name: "استلام الراتب في مصرف الراجحي",
-      amount: 2449.664,
-      bank: "alrajhi",
-      toBank: "",
-      type: "Income",
-      category: "income",
-      plannedDate: `${DEFAULT_MONTH}-25`,
-      actualDate: "",
-      status: "Pending",
-      notes: "Salary received in Al Rajhi Bank"
-    },
-    {
-      name: "اقتطاع قرض السكن",
-      amount: 444.000,
-      bank: "alrajhi",
-      toBank: "",
-      type: "Deduction",
-      category: "salaryDeduction",
-      plannedDate: `${DEFAULT_MONTH}-25`,
-      actualDate: "",
-      status: "Pending",
-      notes: "خصم مباشر من الراجحي"
-    },
-    {
-      name: "تحويل المبلغ المتبقي إلى البنك العربي",
-      amount: 2005.664,
-      bank: "alrajhi",
-      toBank: "arab",
-      type: "Transfer",
-      category: "internal",
-      plannedDate: `${DEFAULT_MONTH}-25`,
-      actualDate: "",
-      status: "Pending",
-      notes: "تحويل داخلي لا يُحسب كمصروف"
-    },
-    {
-      name: "استلام تعويض قرض السكن في الراجحي",
-      amount: 444.000,
-      bank: "alrajhi",
-      toBank: "",
-      type: "Reimbursement",
-      category: "income",
-      plannedDate: `${DEFAULT_MONTH}-25`,
-      actualDate: "",
-      status: "Pending",
-      notes: "Home loan reimbursement"
-    },
-    {
-      name: "تحويل تعويض قرض السكن إلى البنك العربي",
-      amount: 444.000,
-      bank: "alrajhi",
-      toBank: "arab",
-      type: "Transfer",
-      category: "internal",
-      plannedDate: `${DEFAULT_MONTH}-25`,
-      actualDate: "",
-      status: "Pending",
-      notes: "تحويل التعويض إلى العربي"
-    },
-    {
-      name: "استلام تعويض بدل الإيجار في الراجحي",
-      amount: 421.000,
-      bank: "alrajhi",
-      toBank: "",
-      type: "Reimbursement",
-      category: "income",
-      plannedDate: `${DEFAULT_MONTH}-25`,
-      actualDate: "",
-      status: "Pending",
-      notes: "Rent allowance reimbursement"
-    },
-    {
-      name: "تحويل بدل الإيجار إلى البنك العربي",
-      amount: 421.000,
-      bank: "alrajhi",
-      toBank: "arab",
-      type: "Transfer",
-      category: "internal",
-      plannedDate: `${DEFAULT_MONTH}-25`,
-      actualDate: "",
-      status: "Pending",
-      notes: "تحويل التعويض إلى العربي"
-    },
-    { name: "قرض البنك العربي", amount: 435.000, bank: "arab", toBank: "", type: "Expense", category: "banking", plannedDate: `${DEFAULT_MONTH}-26`, actualDate: "", status: "Pending", notes: "" },
-    { name: "دفعة إلى البنك العربي", amount: 1081.188, bank: "arab", toBank: "", type: "Expense", category: "banking", plannedDate: `${DEFAULT_MONTH}-26`, actualDate: "", status: "Pending", notes: "" },
-    { name: "قسط اللابتوب", amount: 21.000, bank: "arab", toBank: "", type: "Expense", category: "banking", plannedDate: `${DEFAULT_MONTH}-26`, actualDate: "", status: "Pending", notes: "" },
-    { name: "البيت", amount: 150.000, bank: "arab", toBank: "", type: "Expense", category: "home", plannedDate: `${DEFAULT_MONTH}-26`, actualDate: "", status: "Pending", notes: "" },
-    { name: "رسوم تحويل البيت", amount: 100.000, bank: "arab", toBank: "", type: "Expense", category: "home", plannedDate: `${DEFAULT_MONTH}-26`, actualDate: "", status: "Pending", notes: "" },
-    { name: "مسقفات / ضريبة عقار", amount: 213.466, bank: "arab", toBank: "", type: "Expense", category: "home", plannedDate: `${DEFAULT_MONTH}-26`, actualDate: "", status: "Pending", notes: "" },
-    { name: "موبايل", amount: 25.000, bank: "arab", toBank: "", type: "Expense", category: "bills", plannedDate: `${DEFAULT_MONTH}-26`, actualDate: "", status: "Pending", notes: "" },
-    { name: "Microsoft", amount: 5.000, bank: "arab", toBank: "", type: "Expense", category: "bills", plannedDate: `${DEFAULT_MONTH}-26`, actualDate: "", status: "Pending", notes: "" },
-    { name: "المصري", amount: 9.000, bank: "arab", toBank: "", type: "Expense", category: "bills", plannedDate: `${DEFAULT_MONTH}-26`, actualDate: "", status: "Pending", notes: "" },
-    { name: "إنترنت", amount: 20.880, bank: "arab", toBank: "", type: "Expense", category: "bills", plannedDate: `${DEFAULT_MONTH}-26`, actualDate: "", status: "Pending", notes: "" },
-    { name: "كهرباء", amount: 36.488, bank: "arab", toBank: "", type: "Expense", category: "bills", plannedDate: `${DEFAULT_MONTH}-26`, actualDate: "", status: "Pending", notes: "" },
-    { name: "كهرباء العائلة", amount: 45.642, bank: "arab", toBank: "", type: "Expense", category: "bills", plannedDate: `${DEFAULT_MONTH}-26`, actualDate: "", status: "Pending", notes: "" },
-    { name: "إنترنت العائلة", amount: 10.000, bank: "arab", toBank: "", type: "Expense", category: "bills", plannedDate: `${DEFAULT_MONTH}-26`, actualDate: "", status: "Pending", notes: "" },
-    { name: "مياه", amount: 5.000, bank: "arab", toBank: "", type: "Expense", category: "bills", plannedDate: `${DEFAULT_MONTH}-26`, actualDate: "", status: "Pending", notes: "" },
-    { name: "Basel", amount: 100.000, bank: "arab", toBank: "", type: "Expense", category: "personal", plannedDate: `${DEFAULT_MONTH}-27`, actualDate: "", status: "Pending", notes: "" },
-    { name: "Areen", amount: 75.000, bank: "arab", toBank: "", type: "Expense", category: "personal", plannedDate: `${DEFAULT_MONTH}-27`, actualDate: "", status: "Pending", notes: "" },
-    { name: "Mall", amount: 100.000, bank: "arab", toBank: "", type: "Expense", category: "personal", plannedDate: `${DEFAULT_MONTH}-27`, actualDate: "", status: "Pending", notes: "" },
-    { name: "وقود", amount: 100.000, bank: "arab", toBank: "", type: "Expense", category: "personal", plannedDate: `${DEFAULT_MONTH}-27`, actualDate: "", status: "Pending", notes: "" },
-    { name: "مخصص عقيقة", amount: 175.000, bank: "arab", toBank: "", type: "Expense", category: "personal", plannedDate: `${DEFAULT_MONTH}-27`, actualDate: "", status: "Pending", notes: "" },
-    { name: "تحويل إلى آرين - سداد دين", amount: 163.000, bank: "arab", toBank: "", type: "DebtRepayment", category: "debt", plannedDate: `${DEFAULT_MONTH}-27`, actualDate: "", status: "Pending", notes: "مصروف حقيقي وليس تحويل داخلي بين حساباتي" }
-  ].map((tx, index) => ({
-    id: `default_${index + 1}_${cryptoSafeId()}`,
-    ...tx
-  }));
+  let state = load();
+  let data = null;
+  let confirmResolve = null;
 
-  let state = loadState();
-  let derived = null;
-  let confirmResolver = null;
+  const $ = (id) => document.getElementById(id);
 
-  const els = {};
+  const el = {
+    monthInput: $("monthInput"),
+    themeBtn: $("themeBtn"),
+    expectedRemaining: $("expectedRemaining"),
+    balanceExplain: $("balanceExplain"),
+    quickStats: $("quickStats"),
+    flowIncome: $("flowIncome"),
+    flowTransfers: $("flowTransfers"),
+    flowExpenses: $("flowExpenses"),
+    flowRemaining: $("flowRemaining"),
+    openingInputs: Array.from(document.querySelectorAll(".openingInput")),
+    bankCards: $("bankCards"),
+    categoryCards: $("categoryCards"),
+    searchInput: $("searchInput"),
+    statusFilter: $("statusFilter"),
+    transactionList: $("transactionList"),
+    addBtn: $("addBtn"),
+    fabBtn: $("fabBtn"),
+    txDialog: $("txDialog"),
+    txForm: $("txForm"),
+    modalTitle: $("modalTitle"),
+    txId: $("txId"),
+    txName: $("txName"),
+    txAmount: $("txAmount"),
+    txStatus: $("txStatus"),
+    txType: $("txType"),
+    txBank: $("txBank"),
+    txToBank: $("txToBank"),
+    toBankWrap: $("toBankWrap"),
+    txCategory: $("txCategory"),
+    txDate: $("txDate"),
+    txNotes: $("txNotes"),
+    deleteBtn: $("deleteBtn"),
+    copyNextBtn: $("copyNextBtn"),
+    exportBtn: $("exportBtn"),
+    importBtn: $("importBtn"),
+    importFile: $("importFile"),
+    csvBtn: $("csvBtn"),
+    resetBtn: $("resetBtn"),
+    confirmDialog: $("confirmDialog"),
+    confirmTitle: $("confirmTitle"),
+    confirmText: $("confirmText"),
+    confirmPhraseWrap: $("confirmPhraseWrap"),
+    confirmPhrase: $("confirmPhrase"),
+    toast: $("toast")
+  };
 
-  document.addEventListener("DOMContentLoaded", init);
+  init();
 
   function init() {
-    cacheEls();
     ensureMonth(state.activeMonth);
-    applyPreferences();
-    populateCategorySelect();
-    bindEvents();
+    fillCategoryOptions();
+    bind();
     render();
-    if (!state.preferences.onboardingSeen) {
-      openDialog("onboardingDialog");
-    }
   }
 
-  function cacheEls() {
-    [
-      "monthSelector", "accentPicker", "themeToggleBtn", "onboardingBtn", "finishOnboardingBtn",
-      "dashboardCards", "sideExpectedRemaining", "heroFinalBalance", "healthPill", "moneyFlow",
-      "smartSummary", "unpaidCard", "unpaidCount", "largestRemainingCard", "todayActionsCard",
-      "warningsCard", "bankCards", "categoryCards", "transactionsTableBody", "transactionCards",
-      "searchInput", "statusFilter", "bankFilter", "sortSelect", "categoryChart", "statusChart",
-      "balanceChart", "topPaymentsChart", "incomeExpenseChart", "transferExpenseChart", "timelineList",
-      "closingChecklist", "openTransactionBtn", "quickAddFab", "transactionDialog", "transactionForm",
-      "transactionDialogTitle", "transactionId", "txName", "txAmount", "txType", "txBank", "txToBank",
-      "toBankField", "txCategory", "txPlannedDate", "txActualDate", "txStatus", "txNotes",
-      "deleteTransactionBtn", "confirmDialog", "confirmTitle", "confirmMessage", "confirmInputWrap",
-      "confirmInput", "confirmOkBtn", "exportJsonBtn", "importJsonBtn", "jsonImportInput", "exportCsvBtn",
-      "printReportBtn", "resetMonthBtn", "duplicateMonthBtn", "saveStatus", "toastHost"
-    ].forEach((id) => {
-      els[id] = document.getElementById(id);
-    });
-
-    els.openingInputs = Array.from(document.querySelectorAll(".opening-input"));
-    els.navLinks = Array.from(document.querySelectorAll(".nav-link"));
-  }
-
-  function bindEvents() {
-    els.navLinks.forEach((button) => {
-      button.addEventListener("click", () => {
-        els.navLinks.forEach((link) => link.classList.remove("is-active"));
-        button.classList.add("is-active");
-        document.getElementById(button.dataset.target)?.scrollIntoView({ behavior: "smooth", block: "start" });
-      });
-    });
-
-    els.monthSelector.addEventListener("change", () => {
-      state.activeMonth = els.monthSelector.value || DEFAULT_MONTH;
+  function bind() {
+    el.monthInput.addEventListener("change", () => {
+      state.activeMonth = el.monthInput.value || DEFAULT_MONTH;
       ensureMonth(state.activeMonth);
-      saveAndRender("تم تغيير الشهر");
+      saveRender("تم تغيير الشهر");
     });
 
-    els.openingInputs.forEach((input) => {
-      input.addEventListener("input", () => {
-        const month = getActiveMonth();
-        month.openingBalances[input.dataset.bank] = money(input.value);
-        saveAndRender("تم تحديث الرصيد الافتتاحي");
+    el.themeBtn.addEventListener("click", () => {
+      state.theme = state.theme === "dark" ? "light" : "dark";
+      document.documentElement.dataset.theme = state.theme;
+      el.themeBtn.textContent = state.theme === "dark" ? "فاتح" : "داكن";
+      save();
+    });
+
+    document.querySelectorAll("[data-toggle]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const panel = $(button.dataset.toggle);
+        panel.classList.toggle("open");
+        button.querySelector("i").textContent = panel.classList.contains("open") ? "−" : "+";
       });
     });
 
-    els.accentPicker.addEventListener("input", () => {
-      state.preferences.accent = els.accentPicker.value || "#099999";
-      applyPreferences();
-      saveState();
+    el.openingInputs.forEach((input) => {
+      input.addEventListener("input", () => {
+        active().opening[input.dataset.bank] = num(input.value);
+        saveRender();
+      });
     });
 
-    els.themeToggleBtn.addEventListener("click", () => {
-      state.preferences.theme = state.preferences.theme === "dark" ? "light" : "dark";
-      applyPreferences();
-      saveState();
-      render();
-    });
+    el.searchInput.addEventListener("input", renderTransactions);
+    el.statusFilter.addEventListener("change", renderTransactions);
+    el.addBtn.addEventListener("click", () => openEditor());
+    el.fabBtn.addEventListener("click", () => openEditor());
+    el.txType.addEventListener("change", syncFormType);
+    el.txForm.addEventListener("submit", saveTransaction);
+    el.deleteBtn.addEventListener("click", deleteCurrentTransaction);
 
-    els.onboardingBtn.addEventListener("click", () => openDialog("onboardingDialog"));
-    els.finishOnboardingBtn.addEventListener("click", () => {
-      state.preferences.onboardingSeen = true;
-      saveState();
-      closeDialog("onboardingDialog");
-    });
-
-    els.openTransactionBtn.addEventListener("click", () => openTransactionEditor());
-    els.quickAddFab.addEventListener("click", () => openTransactionEditor());
-
-    [els.searchInput, els.statusFilter, els.bankFilter, els.sortSelect].forEach((control) => {
-      control.addEventListener("input", renderTransactions);
-      control.addEventListener("change", renderTransactions);
-    });
-
-    els.txType.addEventListener("change", syncTypeFields);
-    els.transactionForm.addEventListener("submit", onTransactionSubmit);
-    els.deleteTransactionBtn.addEventListener("click", onDeleteTransaction);
-
-    document.querySelectorAll("[data-close-dialog]").forEach((button) => {
-      button.addEventListener("click", () => closeDialog(button.dataset.closeDialog));
-    });
-
-    els.exportJsonBtn.addEventListener("click", exportJson);
-    els.importJsonBtn.addEventListener("click", () => els.jsonImportInput.click());
-    els.jsonImportInput.addEventListener("change", importJson);
-    els.exportCsvBtn.addEventListener("click", exportCsv);
-    els.printReportBtn.addEventListener("click", () => window.print());
-    els.resetMonthBtn.addEventListener("click", resetMonth);
-    els.duplicateMonthBtn.addEventListener("click", duplicateToNextMonth);
-
-    document.addEventListener("change", (event) => {
-      const toggle = event.target.closest("[data-toggle-complete]");
-      if (toggle) {
-        updateTransactionStatus(toggle.dataset.toggleComplete, toggle.checked ? "Completed" : "Pending");
-      }
-
-      const checklist = event.target.closest("[data-checklist-index]");
-      if (checklist) {
-        const month = getActiveMonth();
-        month.closingChecklist[checklist.dataset.checklistIndex] = checklist.checked;
-        saveAndRender("تم تحديث قائمة الإغلاق");
-      }
+    document.querySelectorAll("[data-close]").forEach((button) => {
+      button.addEventListener("click", () => closeDialog(el.txDialog));
     });
 
     document.addEventListener("click", (event) => {
-      const editButton = event.target.closest("[data-edit-id]");
-      if (editButton) {
-        openTransactionEditor(editButton.dataset.editId);
-      }
-
-      const categoryButton = event.target.closest("[data-category-toggle]");
-      if (categoryButton) {
-        const card = categoryButton.closest(".category-card");
-        card?.classList.toggle("is-open");
-      }
+      const edit = event.target.closest("[data-edit]");
+      if (edit) openEditor(edit.dataset.edit);
     });
 
-    els.confirmDialog.addEventListener("close", () => {
-      if (!confirmResolver) return;
-      const confirmed = els.confirmDialog.returnValue === "ok";
-      const needsPhrase = els.confirmInputWrap.classList.contains("is-visible");
-      const phraseValid = !needsPhrase || els.confirmInput.value.trim().toUpperCase() === "RESET";
-      confirmResolver(Boolean(confirmed && phraseValid));
-      confirmResolver = null;
-      els.confirmInput.value = "";
-      els.confirmInputWrap.classList.remove("is-visible");
+    document.addEventListener("change", (event) => {
+      const paid = event.target.closest("[data-paid]");
+      if (!paid) return;
+      const tx = active().items.find((item) => item.id === paid.dataset.paid);
+      if (!tx) return;
+      tx.status = paid.checked ? "Completed" : "Pending";
+      tx.actualDate = paid.checked ? today() : "";
+      saveRender(paid.checked ? "تم تسجيلها كمدفوعة" : "تم إرجاعها لغير مدفوعة");
+    });
+
+    el.copyNextBtn.addEventListener("click", copyToNextMonth);
+    el.exportBtn.addEventListener("click", exportJson);
+    el.importBtn.addEventListener("click", () => el.importFile.click());
+    el.importFile.addEventListener("change", importJson);
+    el.csvBtn.addEventListener("click", exportCsv);
+    el.resetBtn.addEventListener("click", resetMonth);
+
+    el.confirmDialog.addEventListener("close", () => {
+      if (!confirmResolve) return;
+      const ok = el.confirmDialog.returnValue === "ok";
+      const phraseNeeded = !el.confirmPhraseWrap.classList.contains("hidden");
+      const phraseOk = !phraseNeeded || el.confirmPhrase.value.trim().toUpperCase() === "RESET";
+      confirmResolve(ok && phraseOk);
+      confirmResolve = null;
+      el.confirmPhrase.value = "";
+      el.confirmPhraseWrap.classList.add("hidden");
     });
   }
 
-  function loadState() {
-    const fallback = createFreshState();
+  function fillCategoryOptions() {
+    el.txCategory.innerHTML = CATEGORIES.map((cat) => `<option value="${cat.id}">${cat.name}</option>`).join("");
+  }
+
+  function load() {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return fallback;
-      const parsed = JSON.parse(raw);
-      const merged = {
-        version: ACTIVE_VERSION,
-        activeMonth: parsed.activeMonth || DEFAULT_MONTH,
-        preferences: {
-          theme: parsed.preferences?.theme || "dark",
-          accent: parsed.preferences?.accent || "#099999",
-          onboardingSeen: Boolean(parsed.preferences?.onboardingSeen)
-        },
-        months: parsed.months && typeof parsed.months === "object" ? parsed.months : fallback.months
-      };
-
-      Object.keys(merged.months).forEach((monthKey) => normalizeMonth(merged.months[monthKey], monthKey));
-      return merged;
-    } catch {
-      return fallback;
-    }
-  }
-
-  function createFreshState() {
+      const saved = JSON.parse(localStorage.getItem(STORE) || "null");
+      if (saved && saved.months) return saved;
+    } catch {}
     return {
-      version: ACTIVE_VERSION,
       activeMonth: DEFAULT_MONTH,
-      preferences: {
-        theme: "dark",
-        accent: "#099999",
-        onboardingSeen: false
-      },
+      theme: "dark",
       months: {
-        [DEFAULT_MONTH]: createDefaultMonth(DEFAULT_MONTH)
+        [DEFAULT_MONTH]: newMonth(DEFAULT_MONTH)
       }
     };
   }
 
-  function createDefaultMonth(monthKey) {
-    const datePrefix = monthKey || DEFAULT_MONTH;
+  function newMonth(month) {
     return {
-      openingBalances: { alrajhi: 0, arab: 0, cash: 0 },
-      transactions: DEFAULT_TRANSACTIONS.map((tx, index) => ({
-        ...tx,
-        id: `tx_${datePrefix.replace("-", "")}_${index + 1}_${cryptoSafeId()}`,
-        plannedDate: tx.plannedDate.replace(DEFAULT_MONTH, datePrefix),
-        actualDate: ""
-      })),
-      closingChecklist: MONTHLY_CLOSING_ITEMS.map(() => false)
+      opening: { alrajhi: 0, arab: 0, cash: 0 },
+      items: DEFAULT_ITEMS.map((row, index) => ({
+        id: `tx_${month.replace("-", "")}_${index + 1}_${id()}`,
+        name: row[0],
+        amount: row[1],
+        bank: row[2],
+        toBank: row[3],
+        type: row[4],
+        category: row[5],
+        date: `${month}-${String(row[6]).padStart(2, "0")}`,
+        actualDate: "",
+        status: "Pending",
+        notes: row[7]
+      }))
     };
   }
 
-  function normalizeMonth(month, monthKey) {
-    month.openingBalances = {
-      alrajhi: money(month.openingBalances?.alrajhi),
-      arab: money(month.openingBalances?.arab),
-      cash: money(month.openingBalances?.cash)
+  function ensureMonth(month) {
+    if (!state.months[month]) state.months[month] = newMonth(month);
+    const m = state.months[month];
+    m.opening = {
+      alrajhi: num(m.opening?.alrajhi),
+      arab: num(m.opening?.arab),
+      cash: num(m.opening?.cash)
     };
+    m.items = Array.isArray(m.items) ? m.items.map(cleanTx) : [];
+  }
 
-    month.transactions = Array.isArray(month.transactions) ? month.transactions.map((tx) => ({
-      id: tx.id || `tx_${cryptoSafeId()}`,
+  function cleanTx(tx) {
+    return {
+      id: tx.id || `tx_${id()}`,
       name: String(tx.name || "حركة مالية"),
-      amount: Math.abs(money(tx.amount)),
+      amount: Math.abs(num(tx.amount)),
       bank: BANKS[tx.bank] ? tx.bank : "arab",
       toBank: BANKS[tx.toBank] ? tx.toBank : "",
-      type: TYPE_LABELS[tx.type] ? tx.type : "Expense",
-      category: CATEGORY_DEFS.some((cat) => cat.id === tx.category) ? tx.category : "personal",
-      plannedDate: validDate(tx.plannedDate) ? tx.plannedDate : `${monthKey}-01`,
-      actualDate: validDate(tx.actualDate) ? tx.actualDate : "",
-      status: STATUS_LABELS[tx.status] ? tx.status : "Pending",
+      type: TYPES[tx.type] ? tx.type : "Expense",
+      category: CATEGORIES.some((cat) => cat.id === tx.category) ? tx.category : "personal",
+      date: /^\d{4}-\d{2}-\d{2}$/.test(tx.date || "") ? tx.date : `${state.activeMonth}-01`,
+      actualDate: /^\d{4}-\d{2}-\d{2}$/.test(tx.actualDate || "") ? tx.actualDate : "",
+      status: STATUSES[tx.status] ? tx.status : "Pending",
       notes: String(tx.notes || "")
-    })) : [];
-
-    month.closingChecklist = Array.isArray(month.closingChecklist) && month.closingChecklist.length === MONTHLY_CLOSING_ITEMS.length
-      ? month.closingChecklist.map(Boolean)
-      : MONTHLY_CLOSING_ITEMS.map(() => false);
+    };
   }
 
-  function ensureMonth(monthKey) {
-    if (!state.months[monthKey]) {
-      state.months[monthKey] = createDefaultMonth(monthKey);
-    }
-    normalizeMonth(state.months[monthKey], monthKey);
-  }
-
-  function getActiveMonth() {
+  function active() {
     ensureMonth(state.activeMonth);
     return state.months[state.activeMonth];
   }
 
-  function saveState() {
-    showSaving();
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    window.clearTimeout(saveState._timer);
-    saveState._timer = window.setTimeout(() => {
-      els.saveStatus?.classList.remove("is-saving");
-      if (els.saveStatus) els.saveStatus.querySelector("span:last-child").textContent = "محفوظ محلياً";
-    }, 450);
+  function save() {
+    localStorage.setItem(STORE, JSON.stringify(state));
   }
 
-  function saveAndRender(message) {
-    saveState();
+  function saveRender(message = "") {
+    save();
     render();
-    if (message) showToast(message);
-  }
-
-  function showSaving() {
-    if (!els.saveStatus) return;
-    els.saveStatus.classList.add("is-saving");
-    els.saveStatus.querySelector("span:last-child").textContent = "جاري الحفظ...";
-  }
-
-  function applyPreferences() {
-    document.documentElement.dataset.theme = state.preferences.theme || "dark";
-    document.documentElement.style.setProperty("--accent", state.preferences.accent || "#099999");
-    document.documentElement.style.setProperty("--accent-rgb", hexToRgb(state.preferences.accent || "#099999"));
-    els.accentPicker.value = state.preferences.accent || "#099999";
-    els.themeToggleBtn.textContent = state.preferences.theme === "dark" ? "الوضع الفاتح" : "الوضع الداكن";
+    if (message) toast(message);
   }
 
   function render() {
-    derived = calculateMonth(getActiveMonth());
-    els.monthSelector.value = state.activeMonth;
+    document.documentElement.dataset.theme = state.theme;
+    el.themeBtn.textContent = state.theme === "dark" ? "فاتح" : "داكن";
+    el.monthInput.value = state.activeMonth;
+    data = calc(active());
 
-    els.openingInputs.forEach((input) => {
-      input.value = formatInput(getActiveMonth().openingBalances[input.dataset.bank]);
+    el.openingInputs.forEach((input) => {
+      input.value = moneyInput(active().opening[input.dataset.bank]);
     });
 
-    renderDashboard();
+    renderHeader();
     renderBanks();
     renderCategories();
     renderTransactions();
-    renderCharts();
-    renderTimeline();
-    renderClosingChecklist();
-    syncTypeFields();
   }
 
-  function calculateMonth(month) {
-    const sorted = getSortedTransactions(month.transactions, "dateAsc");
-    const plannedBalances = { ...month.openingBalances };
-    const actualBalances = { ...month.openingBalances };
-
-    const bankStats = Object.fromEntries(Object.keys(BANKS).map((id) => [id, {
-      opening: money(month.openingBalances[id]),
-      income: 0,
-      reimbursements: 0,
+  function calc(month) {
+    const balances = { ...month.opening };
+    const actual = { ...month.opening };
+    const category = Object.fromEntries(CATEGORIES.map((cat) => [cat.id, { ...cat, planned: 0, paid: 0, pending: 0, count: 0 }]));
+    const bankStats = Object.fromEntries(Object.keys(BANKS).map((bank) => [bank, {
+      opening: month.opening[bank],
+      expected: month.opening[bank],
+      actual: month.opening[bank],
+      in: 0,
+      out: 0,
       transfersIn: 0,
-      transfersOut: 0,
-      deductions: 0,
-      expenses: 0,
-      actualIncome: 0,
-      actualReimbursements: 0,
-      actualTransfersIn: 0,
-      actualTransfersOut: 0,
-      actualDeductions: 0,
-      actualExpenses: 0,
-      plannedFinal: money(month.openingBalances[id]),
-      actualFinal: money(month.openingBalances[id]),
-      ledger: []
+      transfersOut: 0
     }]));
 
-    const categoryStats = Object.fromEntries(CATEGORY_DEFS.map((cat) => [cat.id, {
-      ...cat,
-      planned: 0,
-      completed: 0,
-      pending: 0,
-      count: 0,
-      transactions: []
-    }]));
-
-    const timeline = [];
-    const actualTimeline = [];
-
-    let totalIncome = 0;
-    let totalSalary = 0;
-    let totalReimbursements = 0;
-    let totalRealExpenses = 0;
-    let completedExpenses = 0;
+    let income = 0;
+    let reimbursements = 0;
+    let expenses = 0;
+    let paidExpenses = 0;
     let pendingExpenses = 0;
-    let transferVolume = 0;
-    let completedTransferVolume = 0;
+    let transfers = 0;
+    let completedCount = 0;
 
-    sorted.forEach((tx, index) => {
-      const amount = money(tx.amount);
-      const plannedBefore = plannedBalances[tx.bank] ?? 0;
-      const actualBefore = actualBalances[tx.bank] ?? 0;
-      const isCompleted = tx.status === "Completed";
-      const isSkipped = tx.status === "Skipped";
-      const isRealExpense = isExpenseLike(tx.type);
-      const isIncome = tx.type === "Income" || tx.type === "Reimbursement";
+    const timeline = [...month.items].sort((a, b) => new Date(a.date) - new Date(b.date)).map((tx) => {
+      const before = balances[tx.bank] || 0;
+      const actualBefore = actual[tx.bank] || 0;
+      const amount = num(tx.amount);
+      const skipped = tx.status === "Skipped";
+      const completed = tx.status === "Completed";
+      const expense = isExpense(tx.type);
+      const inc = tx.type === "Income" || tx.type === "Reimbursement";
 
-      let plannedAfter = plannedBefore;
-      let actualAfter = actualBefore;
-
-      if (!isSkipped) {
-        if (tx.type === "Transfer") {
-          plannedAfter = plannedBefore - amount;
-          plannedBalances[tx.bank] = plannedAfter;
-          if (tx.toBank && plannedBalances[tx.toBank] !== undefined) {
-            plannedBalances[tx.toBank] += amount;
-          }
-
+      if (!skipped) {
+        if (inc) {
+          balances[tx.bank] += amount;
+          bankStats[tx.bank].in += amount;
+          income += amount;
+          if (tx.type === "Reimbursement") reimbursements += amount;
+        } else if (expense) {
+          balances[tx.bank] -= amount;
+          bankStats[tx.bank].out += amount;
+          expenses += amount;
+        } else if (tx.type === "Transfer") {
+          balances[tx.bank] -= amount;
+          if (tx.toBank) balances[tx.toBank] += amount;
           bankStats[tx.bank].transfersOut += amount;
           if (tx.toBank) bankStats[tx.toBank].transfersIn += amount;
-          transferVolume += amount;
-        } else if (isIncome) {
-          plannedAfter = plannedBefore + amount;
-          plannedBalances[tx.bank] = plannedAfter;
-          bankStats[tx.bank].income += amount;
-          if (tx.type === "Income") totalSalary += amount;
-          if (tx.type === "Reimbursement") {
-            bankStats[tx.bank].reimbursements += amount;
-            totalReimbursements += amount;
-          }
-          totalIncome += amount;
-        } else if (isRealExpense) {
-          plannedAfter = plannedBefore - amount;
-          plannedBalances[tx.bank] = plannedAfter;
-          totalRealExpenses += amount;
-          if (tx.type === "Deduction") bankStats[tx.bank].deductions += amount;
-          else bankStats[tx.bank].expenses += amount;
+          transfers += amount;
         }
       }
 
-      if (isCompleted && !isSkipped) {
-        if (tx.type === "Transfer") {
-          actualAfter = actualBefore - amount;
-          actualBalances[tx.bank] = actualAfter;
-          if (tx.toBank && actualBalances[tx.toBank] !== undefined) {
-            actualBalances[tx.toBank] += amount;
-          }
-          bankStats[tx.bank].actualTransfersOut += amount;
-          if (tx.toBank) bankStats[tx.toBank].actualTransfersIn += amount;
-          completedTransferVolume += amount;
-        } else if (isIncome) {
-          actualAfter = actualBefore + amount;
-          actualBalances[tx.bank] = actualAfter;
-          bankStats[tx.bank].actualIncome += amount;
-          if (tx.type === "Reimbursement") bankStats[tx.bank].actualReimbursements += amount;
-        } else if (isRealExpense) {
-          actualAfter = actualBefore - amount;
-          actualBalances[tx.bank] = actualAfter;
-          completedExpenses += amount;
-          if (tx.type === "Deduction") bankStats[tx.bank].actualDeductions += amount;
-          else bankStats[tx.bank].actualExpenses += amount;
+      if (completed && !skipped) {
+        completedCount += 1;
+        if (inc) {
+          actual[tx.bank] += amount;
+        } else if (expense) {
+          actual[tx.bank] -= amount;
+          paidExpenses += amount;
+        } else if (tx.type === "Transfer") {
+          actual[tx.bank] -= amount;
+          if (tx.toBank) actual[tx.toBank] += amount;
         }
       }
 
-      if (isRealExpense && tx.status !== "Completed" && tx.status !== "Skipped") {
+      if (expense && tx.status !== "Completed" && tx.status !== "Skipped") {
         pendingExpenses += amount;
       }
 
-      if (categoryStats[tx.category]) {
-        const category = categoryStats[tx.category];
-        category.count += 1;
-        category.transactions.push(tx);
-        if (!isSkipped && isRealExpense) {
-          category.planned += amount;
-          if (isCompleted) category.completed += amount;
-          else category.pending += amount;
-        }
+      if (expense && category[tx.category]) {
+        category[tx.category].planned += amount;
+        category[tx.category].count += 1;
+        if (completed) category[tx.category].paid += amount;
+        else if (!skipped) category[tx.category].pending += amount;
       }
 
-      const enriched = {
+      Object.keys(BANKS).forEach((bank) => {
+        bankStats[bank].expected = balances[bank];
+        bankStats[bank].actual = actual[bank];
+      });
+
+      return {
         ...tx,
-        sequence: index + 1,
-        plannedBefore,
-        plannedAfter,
+        before,
+        after: balances[tx.bank],
         actualBefore,
-        actualAfter,
-        signedAmount: signedAmount(tx),
-        isRealExpense,
-        isIncome,
-        categoryName: getCategoryName(tx.category),
-        bankName: BANKS[tx.bank]?.name || tx.bank,
-        toBankName: tx.toBank ? BANKS[tx.toBank]?.name : ""
+        categoryName: catName(tx.category),
+        bankName: BANKS[tx.bank],
+        toBankName: tx.toBank ? BANKS[tx.toBank] : ""
       };
-
-      bankStats[tx.bank].ledger.push(enriched);
-      timeline.push(enriched);
-
-      if (isCompleted) {
-        actualTimeline.push(enriched);
-      }
     });
-
-    Object.keys(BANKS).forEach((id) => {
-      bankStats[id].plannedFinal = plannedBalances[id];
-      bankStats[id].actualFinal = actualBalances[id];
-    });
-
-    const plannedFinalRemaining = sum(Object.values(plannedBalances));
-    const actualCurrentRemaining = sum(Object.values(actualBalances));
-    const totalAvailableFunds = totalIncome;
-    const completionByExpense = totalRealExpenses ? completedExpenses / totalRealExpenses : 0;
-    const completionByCount = sorted.length ? sorted.filter((tx) => tx.status === "Completed").length / sorted.length : 0;
-    const largestCategory = Object.values(categoryStats)
-      .filter((cat) => cat.kind === "expense")
-      .sort((a, b) => b.planned - a.planned)[0];
-
-    const delayed = sorted.filter((tx) => tx.status === "Delayed" || isPastDue(tx));
-    const healthScore = calculateHealthScore({ plannedFinalRemaining, pendingExpenses, delayedCount: delayed.length, completionByExpense, totalRealExpenses });
-    const financialPressure = calculatePressure(totalRealExpenses, totalAvailableFunds);
 
     return {
-      sorted,
-      bankStats,
-      categoryStats,
       timeline,
-      actualTimeline,
-      totalSalary,
-      totalReimbursements,
-      totalAvailableFunds,
-      totalRealExpenses,
-      completedExpenses,
+      category,
+      bankStats,
+      income,
+      reimbursements,
+      expenses,
+      paidExpenses,
       pendingExpenses,
-      plannedFinalRemaining,
-      actualCurrentRemaining,
-      completionByExpense,
-      completionByCount,
-      largestCategory,
-      delayed,
-      healthScore,
-      financialPressure,
-      transferVolume,
-      completedTransferVolume,
-      plannedBalances,
-      actualBalances
+      transfers,
+      expectedRemaining: Object.values(balances).reduce((a, b) => a + b, 0),
+      actualRemaining: Object.values(actual).reduce((a, b) => a + b, 0),
+      completedCount,
+      totalCount: month.items.length
     };
   }
 
-  function renderDashboard() {
-    const cards = [
-      { label: "إجمالي الأموال المتاحة", value: fmt(derived.totalAvailableFunds), sub: "راتب + تعويضات" },
-      { label: "الراتب", value: fmt(derived.totalSalary), sub: "Salary amount" },
-      { label: "إجمالي التعويضات", value: fmt(derived.totalReimbursements), sub: "تحويلات تعويض للراتب" },
-      { label: "المصروفات المخططة", value: fmt(derived.totalRealExpenses), sub: "مصروف حقيقي بدون تكرار التحويلات" },
-      { label: "المصروفات المكتملة", value: fmt(derived.completedExpenses), sub: pct(derived.completionByExpense) },
-      { label: "المصروفات المتبقية", value: fmt(derived.pendingExpenses), sub: "Pending + Delayed" },
-      { label: "المتبقي المتوقع النهائي", value: fmt(derived.plannedFinalRemaining), sub: "بعد كل الحركات المخططة" },
-      { label: "الرصيد الحالي الفعلي", value: fmt(derived.actualCurrentRemaining), sub: "حسب الحركات المكتملة فقط" },
-      { label: "رصيد الراجحي الحالي", value: fmt(derived.bankStats.alrajhi.actualFinal), sub: `المتوقع: ${fmt(derived.bankStats.alrajhi.plannedFinal)}` },
-      { label: "رصيد العربي الحالي", value: fmt(derived.bankStats.arab.actualFinal), sub: `المتوقع: ${fmt(derived.bankStats.arab.plannedFinal)}` },
-      { label: "نسبة الإنجاز", value: pct(derived.completionByCount), sub: "حسب عدد الحركات" },
-      { label: "أكبر تصنيف", value: derived.largestCategory?.name || "غير متاح", sub: derived.largestCategory ? fmt(derived.largestCategory.planned) : "0.000 JOD" },
-      { label: "مؤشر الضغط المالي", value: derived.financialPressure.label, sub: pct(derived.financialPressure.ratio) },
-      { label: "التحويلات الداخلية", value: fmt(derived.transferVolume), sub: "لا تُحتسب كمصروف" },
-      { label: "فرق المخطط والفعلي", value: fmt(derived.plannedFinalRemaining - derived.actualCurrentRemaining), sub: "Expected - Actual" },
-      { label: "النتيجة النهائية", value: fmt(derived.plannedFinalRemaining), sub: "Final remaining balance" }
+  function renderHeader() {
+    el.expectedRemaining.textContent = fmt(data.expectedRemaining);
+    el.balanceExplain.textContent = `الحالي الفعلي: ${fmt(data.actualRemaining)}`;
+
+    const completion = data.totalCount ? data.completedCount / data.totalCount : 0;
+    const stats = [
+      ["الأموال المتاحة", data.income, "راتب + تعويضات"],
+      ["المصروفات", data.expenses, "بدون التحويلات الداخلية"],
+      ["المدفوع", data.paidExpenses, `${pct(completion)} من الحركات`],
+      ["المتبقي للدفع", data.pendingExpenses, "غير مدفوع + متأخر"]
     ];
 
-    els.dashboardCards.innerHTML = cards.map((card, index) => `
-      <article class="kpi-card" style="animation-delay:${index * 24}ms">
-        <span>${escapeHtml(card.label)}</span>
-        <strong>${escapeHtml(card.value)}</strong>
-        <small>${escapeHtml(card.sub)}</small>
+    el.quickStats.innerHTML = stats.map((item) => `
+      <article class="statCard">
+        <span>${item[0]}</span>
+        <strong>${fmt(item[1])}</strong>
+        <small>${item[2]}</small>
       </article>
     `).join("");
 
-    els.sideExpectedRemaining.textContent = fmt(derived.plannedFinalRemaining);
-    els.heroFinalBalance.textContent = fmt(derived.plannedFinalRemaining);
-    els.healthPill.textContent = `Score ${derived.healthScore}/100`;
-
-    renderMoneyFlow();
-    renderSmartSummary();
-    renderInsightCards();
-  }
-
-  function renderMoneyFlow() {
-    const arabReceived = derived.bankStats.arab.transfersIn;
-    els.moneyFlow.innerHTML = [
-      { title: "الراتب", value: derived.totalSalary, sub: "دخل الراتب إلى الراجحي" },
-      { title: "الراجحي", value: derived.bankStats.alrajhi.plannedFinal, sub: `اقتطاعات ${fmt(derived.bankStats.alrajhi.deductions)} + تحويلات ${fmt(derived.bankStats.alrajhi.transfersOut)}` },
-      { title: "التعويضات", value: derived.totalReimbursements, sub: "تعويض قرض السكن + بدل الإيجار" },
-      { title: "البنك العربي", value: arabReceived, sub: "استقبل الحوالات ثم دفع المصروفات" },
-      { title: "المصروفات والنتيجة", value: derived.totalRealExpenses, sub: `المتبقي النهائي: ${fmt(derived.plannedFinalRemaining)}` }
-    ].map((node) => `
-      <div class="flow-node">
-        <span>${escapeHtml(node.title)}</span>
-        <strong>${fmt(node.value)}</strong>
-        <small>${escapeHtml(node.sub)}</small>
-      </div>
-    `).join("");
-  }
-
-  function renderSmartSummary() {
-    const exactZero = Math.abs(derived.plannedFinalRemaining) < 0.0005;
-    els.smartSummary.innerHTML = `
-      <p>إجمالي الأموال المتاحة هو <strong>${fmt(derived.totalAvailableFunds)}</strong>، ويتكوّن من راتب بقيمة <strong>${fmt(derived.totalSalary)}</strong> وتعويضات بقيمة <strong>${fmt(derived.totalReimbursements)}</strong>.</p>
-      <p>إجمالي المصروفات الحقيقية النهائية هو <strong>${fmt(derived.totalRealExpenses)}</strong>. التحويلات بين الراجحي والعربي مفصولة ولا تُحسب كمصروف مكرر.</p>
-      <p>النتيجة النهائية: <strong>${exactZero ? "المتبقي النهائي 0.000 JOD" : `المتبقي النهائي ${fmt(derived.plannedFinalRemaining)}`}</strong>.</p>
-      <p>الرصيد الفعلي الحالي حسب الحركات المكتملة فقط هو <strong>${fmt(derived.actualCurrentRemaining)}</strong>.</p>
-    `;
-  }
-
-  function renderInsightCards() {
-    els.unpaidCard.textContent = fmt(derived.pendingExpenses);
-    const pendingCount = derived.sorted.filter((tx) => isExpenseLike(tx.type) && tx.status !== "Completed" && tx.status !== "Skipped").length;
-    els.unpaidCount.textContent = `${pendingCount} حركات`;
-
-    const remaining = derived.sorted
-      .filter((tx) => isExpenseLike(tx.type) && tx.status !== "Completed" && tx.status !== "Skipped")
-      .sort((a, b) => b.amount - a.amount)
-      .slice(0, 3);
-
-    els.largestRemainingCard.innerHTML = remaining.length ? remaining.map((tx) => `
-      <div class="mini-item"><span>${escapeHtml(tx.name)}</span><strong>${fmt(tx.amount)}</strong></div>
-    `).join("") : `<div class="mini-item"><span>لا توجد التزامات متبقية</span><strong>—</strong></div>`;
-
-    const today = new Date().toISOString().slice(0, 10);
-    const todayItems = derived.sorted
-      .filter((tx) => tx.plannedDate === today && tx.status !== "Completed" && tx.status !== "Skipped")
-      .slice(0, 3);
-
-    els.todayActionsCard.innerHTML = todayItems.length ? todayItems.map((tx) => `
-      <div class="mini-item"><span>${escapeHtml(tx.name)}</span><strong>${fmt(tx.amount)}</strong></div>
-    `).join("") : `<div class="mini-item"><span>لا توجد حركات مستحقة اليوم</span><strong>—</strong></div>`;
-
-    const warnings = [];
-    if (Math.abs(derived.plannedFinalRemaining) > 0.0005) warnings.push(`المتبقي المتوقع ليس صفراً: ${fmt(derived.plannedFinalRemaining)}`);
-    if (derived.delayed.length) warnings.push(`${derived.delayed.length} حركة متأخرة أو تجاوزت تاريخها`);
-    if (Math.abs(derived.actualCurrentRemaining - sum(Object.values(derived.actualBalances))) > 0.0005) warnings.push("يوجد اختلاف في الرصيد الفعلي");
-    if (!warnings.length) warnings.push("لا توجد تنبيهات حرجة");
-
-    els.warningsCard.innerHTML = warnings.slice(0, 3).map((warning) => `
-      <div class="mini-item"><span>${escapeHtml(warning)}</span><strong>${warning.includes("لا توجد") ? "مستقر" : "تنبيه"}</strong></div>
-    `).join("");
+    el.flowIncome.textContent = shortFmt(data.income);
+    el.flowTransfers.textContent = shortFmt(data.transfers);
+    el.flowExpenses.textContent = shortFmt(data.expenses);
+    el.flowRemaining.textContent = shortFmt(data.expectedRemaining);
   }
 
   function renderBanks() {
-    els.bankCards.innerHTML = Object.values(BANKS).map((bank) => {
-      const stat = derived.bankStats[bank.id];
-      const ledger = stat.ledger.slice(0, 5).map((tx) => `
-        <div class="ledger-item">
-          <span>${formatDate(tx.plannedDate)}</span>
-          <strong>${escapeHtml(tx.name)}</strong>
-          <span class="${amountClass(tx.signedAmount)}">${fmtSigned(tx.signedAmount)}</span>
-        </div>
-      `).join("");
-
+    el.bankCards.innerHTML = Object.entries(BANKS).map(([id, name]) => {
+      const s = data.bankStats[id];
       return `
-        <article class="bank-card">
-          <div class="bank-card-head">
-            <div>
-              <p class="eyebrow">Bank Ledger</p>
-              <h4>${escapeHtml(bank.name)}</h4>
-            </div>
-            <div class="bank-balance">
-              <span class="eyebrow">الرصيد الفعلي</span>
-              <strong>${fmt(stat.actualFinal)}</strong>
-            </div>
-          </div>
-
-          <div class="metric-list">
-            <div class="metric-row"><span>الرصيد الافتتاحي</span><strong>${fmt(stat.opening)}</strong></div>
-            <div class="metric-row"><span>إجمالي الدخل</span><strong>${fmt(stat.income)}</strong></div>
-            <div class="metric-row"><span>تحويلات داخلة</span><strong>${fmt(stat.transfersIn)}</strong></div>
-            <div class="metric-row"><span>تحويلات خارجة</span><strong>${fmt(stat.transfersOut)}</strong></div>
-            <div class="metric-row"><span>اقتطاعات</span><strong>${fmt(stat.deductions)}</strong></div>
-            <div class="metric-row"><span>مصروفات</span><strong>${fmt(stat.expenses)}</strong></div>
-            <div class="metric-row"><span>الرصيد المتوقع النهائي</span><strong>${fmt(stat.plannedFinal)}</strong></div>
-            <div class="metric-row"><span>الرصيد الفعلي الحالي</span><strong>${fmt(stat.actualFinal)}</strong></div>
-          </div>
-
-          <div class="mini-ledger">
-            ${ledger || `<div class="ledger-item"><span>—</span><strong>لا توجد حركات</strong><span>—</span></div>`}
+        <article class="bankCard">
+          <h3>${name}</h3>
+          <strong class="bankValue">${fmt(s.actual)}</strong>
+          <div class="miniRows">
+            <div class="miniRow"><span>افتتاحي</span><strong>${fmt(s.opening)}</strong></div>
+            <div class="miniRow"><span>داخل</span><strong>${fmt(s.in + s.transfersIn)}</strong></div>
+            <div class="miniRow"><span>خارج</span><strong>${fmt(s.out + s.transfersOut)}</strong></div>
+            <div class="miniRow"><span>نهائي متوقع</span><strong>${fmt(s.expected)}</strong></div>
           </div>
         </article>
       `;
@@ -783,651 +450,343 @@
   }
 
   function renderCategories() {
-    const expenseCategories = Object.values(derived.categoryStats).filter((cat) => cat.kind === "expense");
-    els.categoryCards.innerHTML = expenseCategories.map((category, index) => {
-      const percent = category.planned ? category.completed / category.planned : 0;
-      const transactions = category.transactions.map((tx) => `
-        <div class="category-transaction">
-          <strong>${escapeHtml(tx.name)}</strong>
-          <span>${STATUS_LABELS[tx.status]}</span>
-          <span>${fmt(tx.amount)}</span>
-        </div>
-      `).join("");
-
+    const cats = Object.values(data.category).filter((cat) => !["income", "internal"].includes(cat.id));
+    const max = Math.max(1, ...cats.map((cat) => cat.planned));
+    el.categoryCards.innerHTML = cats.map((cat) => {
+      const p = cat.planned ? cat.paid / cat.planned : 0;
       return `
-        <article class="category-card ${index === 0 ? "is-open" : ""}">
-          <button class="category-button" type="button" data-category-toggle="${category.id}">
-            <div>
-              <h4>${escapeHtml(category.name)}</h4>
-              <div class="category-summary">
-                <span>المخطط: ${fmt(category.planned)}</span>
-                <span>المكتمل: ${fmt(category.completed)}</span>
-                <span>المتبقي: ${fmt(category.pending)}</span>
-                <span>${category.count} حركات</span>
-              </div>
-              <div class="progress-track"><div class="progress-fill" style="width:${clamp(percent * 100, 0, 100)}%"></div></div>
-            </div>
-            <span class="mini-badge">${pct(percent)}</span>
-          </button>
-          <div class="category-content">
-            ${transactions || `<div class="category-transaction"><strong>لا توجد حركات</strong><span>—</span><span>—</span></div>`}
-            <div class="mini-item"><span>تحليل التصنيف</span><strong>${category.pending > 0 ? "يوجد مبلغ متبقٍ" : "مكتمل أو غير مستحق"}</strong></div>
+        <article class="categoryCard">
+          <h3>${cat.name}</h3>
+          <div class="miniRows">
+            <div class="miniRow"><span>المخطط</span><strong>${fmt(cat.planned)}</strong></div>
+            <div class="miniRow"><span>المدفوع</span><strong>${fmt(cat.paid)}</strong></div>
+            <div class="miniRow"><span>المتبقي</span><strong>${fmt(cat.pending)}</strong></div>
           </div>
+          <div class="progress"><span style="--w:${Math.min(100, (cat.planned / max) * 100)}%"></span></div>
+          <small>${pct(p)} مكتمل</small>
         </article>
       `;
     }).join("");
   }
 
   function renderTransactions() {
-    const list = getFilteredTransactions();
-    els.transactionsTableBody.innerHTML = list.map((tx) => `
-      <tr>
-        <td>
-          <label class="checkbox-toggle" title="تغيير حالة الاكتمال">
-            <input type="checkbox" data-toggle-complete="${tx.id}" ${tx.status === "Completed" ? "checked" : ""} />
-            <span></span>
-          </label>
-        </td>
-        <td><strong>${escapeHtml(tx.name)}</strong><br><small>${escapeHtml(tx.notes || "")}</small></td>
-        <td><span class="type-badge ${tx.type}">${TYPE_LABELS[tx.type]}</span></td>
-        <td>${escapeHtml(tx.bankName)}${tx.toBankName ? ` ← ${escapeHtml(tx.toBankName)}` : ""}</td>
-        <td>${escapeHtml(tx.categoryName)}</td>
-        <td class="${amountClass(tx.signedAmount)}"><strong>${fmtSigned(tx.signedAmount)}</strong></td>
-        <td>${formatDate(tx.plannedDate)}</td>
-        <td>${fmt(tx.plannedBefore)}</td>
-        <td>${fmt(tx.plannedAfter)}</td>
-        <td>
-          <div class="row-actions">
-            <span class="status-badge ${tx.status}">${STATUS_LABELS[tx.status]}</span>
-            <button class="btn btn-soft" type="button" data-edit-id="${tx.id}">تعديل</button>
-          </div>
-        </td>
-      </tr>
-    `).join("");
-
-    els.transactionCards.innerHTML = list.map((tx) => `
-      <article class="mobile-tx-card">
-        <div class="mobile-tx-top">
-          <div>
-            <h4>${escapeHtml(tx.name)}</h4>
-            <span class="status-badge ${tx.status}">${STATUS_LABELS[tx.status]}</span>
-          </div>
-          <label class="checkbox-toggle" title="تغيير حالة الاكتمال">
-            <input type="checkbox" data-toggle-complete="${tx.id}" ${tx.status === "Completed" ? "checked" : ""} />
-            <span></span>
-          </label>
-        </div>
-        <div class="mobile-tx-meta">
-          <div><span>المبلغ</span><strong class="${amountClass(tx.signedAmount)}">${fmtSigned(tx.signedAmount)}</strong></div>
-          <div><span>البنك</span><strong>${escapeHtml(tx.bankName)}</strong></div>
-          <div><span>التصنيف</span><strong>${escapeHtml(tx.categoryName)}</strong></div>
-          <div><span>التاريخ</span><strong>${formatDate(tx.plannedDate)}</strong></div>
-          <div><span>الرصيد قبل</span><strong>${fmt(tx.plannedBefore)}</strong></div>
-          <div><span>الرصيد بعد</span><strong>${fmt(tx.plannedAfter)}</strong></div>
-        </div>
-        <div class="modal-actions">
-          <button class="btn btn-soft" type="button" data-edit-id="${tx.id}">تعديل</button>
-        </div>
-      </article>
-    `).join("");
-  }
-
-  function renderCharts() {
-    renderCategoryChart();
-    renderStatusChart();
-    renderBalanceChart();
-    renderTopPaymentsChart();
-    renderComparisonCharts();
-  }
-
-  function renderCategoryChart() {
-    const expenseCategories = Object.values(derived.categoryStats).filter((cat) => cat.kind === "expense");
-    const maxValue = Math.max(1, ...expenseCategories.map((cat) => cat.planned));
-    els.categoryChart.innerHTML = expenseCategories.map((cat) => `
-      <div class="bar-row">
-        <div class="bar-row-head"><span>${escapeHtml(cat.name)}</span><strong>${fmt(cat.planned)}</strong></div>
-        <div class="bar-track"><div class="bar-fill" style="--w:${(cat.planned / maxValue) * 100}%"></div></div>
-      </div>
-    `).join("");
-  }
-
-  function renderStatusChart() {
-    const completed = derived.completedExpenses;
-    const pending = derived.pendingExpenses;
-    const skipped = sum(derived.sorted.filter((tx) => isExpenseLike(tx.type) && tx.status === "Skipped").map((tx) => tx.amount));
-    const total = Math.max(0.001, completed + pending + skipped);
-    const completedDeg = (completed / total) * 360;
-    const pendingDeg = completedDeg + ((pending / total) * 360);
-    els.statusChart.innerHTML = `
-      <div class="donut" style="--completedDeg:${completedDeg}deg;--pendingDeg:${pendingDeg}deg" data-label="${pct(completed / total)}"></div>
-      <div class="legend">
-        <div class="legend-item"><span><i class="legend-dot" style="background:var(--green)"></i>مكتمل</span><strong>${fmt(completed)}</strong></div>
-        <div class="legend-item"><span><i class="legend-dot" style="background:var(--amber)"></i>معلق</span><strong>${fmt(pending)}</strong></div>
-        <div class="legend-item"><span><i class="legend-dot" style="background:var(--red)"></i>متجاوز</span><strong>${fmt(skipped)}</strong></div>
-      </div>
-    `;
-  }
-
-  function renderBalanceChart() {
-    const points = buildBalancePoints(derived.timeline);
-    const width = 720;
-    const height = 240;
-    const padding = 34;
-    const allValues = points.flatMap((point) => [point.alrajhi, point.arab, point.cash]);
-    const min = Math.min(...allValues, 0);
-    const max = Math.max(...allValues, 1);
-    const y = (value) => height - padding - ((value - min) / (max - min || 1)) * (height - padding * 2);
-    const x = (index) => padding + (index / Math.max(1, points.length - 1)) * (width - padding * 2);
-    const line = (bank) => points.map((point, index) => `${x(index)},${y(point[bank])}`).join(" ");
-
-    els.balanceChart.innerHTML = `
-      <svg class="line-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="حركة أرصدة البنوك">
-        <line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}" stroke="currentColor" opacity=".18"/>
-        <line x1="${padding}" y1="${padding}" x2="${padding}" y2="${height - padding}" stroke="currentColor" opacity=".18"/>
-        <polyline points="${line("alrajhi")}" fill="none" stroke="var(--accent)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-        <polyline points="${line("arab")}" fill="none" stroke="var(--green)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-        <polyline points="${line("cash")}" fill="none" stroke="var(--gold)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-        <text x="${padding}" y="${padding - 10}">${fmt(max)}</text>
-        <text x="${padding}" y="${height - 8}">${fmt(min)}</text>
-        <text x="${width - 170}" y="26">الراجحي / العربي / نقدي</text>
-      </svg>
-    `;
-  }
-
-  function renderTopPaymentsChart() {
-    const top = derived.sorted
-      .filter((tx) => isExpenseLike(tx.type))
-      .sort((a, b) => b.amount - a.amount)
-      .slice(0, 5);
-    const maxValue = Math.max(1, ...top.map((tx) => tx.amount));
-
-    els.topPaymentsChart.innerHTML = top.map((tx) => `
-      <div class="bar-row">
-        <div class="bar-row-head"><span>${escapeHtml(tx.name)}</span><strong>${fmt(tx.amount)}</strong></div>
-        <div class="bar-track"><div class="bar-fill" style="--w:${(tx.amount / maxValue) * 100}%"></div></div>
-      </div>
-    `).join("");
-  }
-
-  function renderComparisonCharts() {
-    const incomeExpense = [
-      { label: "الدخل والتعويضات", value: derived.totalAvailableFunds },
-      { label: "المصروفات الحقيقية", value: derived.totalRealExpenses }
-    ];
-    const transfersExpenses = [
-      { label: "التحويلات الداخلية", value: derived.transferVolume },
-      { label: "المصروفات الحقيقية", value: derived.totalRealExpenses }
-    ];
-
-    els.incomeExpenseChart.innerHTML = renderComparisonRows(incomeExpense);
-    els.transferExpenseChart.innerHTML = renderComparisonRows(transfersExpenses);
-  }
-
-  function renderComparisonRows(rows) {
-    const maxValue = Math.max(1, ...rows.map((row) => row.value));
-    return rows.map((row) => `
-      <div class="compare-row">
-        <div class="compare-row-head"><span>${escapeHtml(row.label)}</span><strong>${fmt(row.value)}</strong></div>
-        <div class="compare-track"><div class="compare-fill" style="--w:${(row.value / maxValue) * 100}%"></div></div>
-      </div>
-    `).join("");
-  }
-
-  function renderTimeline() {
-    els.timelineList.innerHTML = derived.timeline.map((tx) => `
-      <article class="timeline-item">
-        <div class="timeline-date">${formatDate(tx.plannedDate)}<br><span class="status-badge ${tx.status}">${STATUS_LABELS[tx.status]}</span></div>
-        <div class="timeline-body">
-          <strong>${escapeHtml(tx.name)}</strong>
-          <span>${escapeHtml(tx.bankName)}${tx.toBankName ? ` ← ${escapeHtml(tx.toBankName)}` : ""} · ${escapeHtml(tx.categoryName)}</span>
-          ${tx.notes ? `<br><span>${escapeHtml(tx.notes)}</span>` : ""}
-        </div>
-        <div class="timeline-amount">
-          <strong class="${amountClass(tx.signedAmount)}">${fmtSigned(tx.signedAmount)}</strong>
-          <small>قبل: ${fmt(tx.plannedBefore)}</small>
-          <small>بعد: ${fmt(tx.plannedAfter)}</small>
-        </div>
-      </article>
-    `).join("");
-  }
-
-  function renderClosingChecklist() {
-    const month = getActiveMonth();
-    els.closingChecklist.innerHTML = MONTHLY_CLOSING_ITEMS.map((item, index) => `
-      <label class="check-item">
-        <input type="checkbox" data-checklist-index="${index}" ${month.closingChecklist[index] ? "checked" : ""} />
-        <span>${escapeHtml(item)}</span>
-      </label>
-    `).join("");
-  }
-
-  function populateCategorySelect() {
-    els.txCategory.innerHTML = CATEGORY_DEFS.map((cat) => `<option value="${cat.id}">${cat.name}</option>`).join("");
-  }
-
-  function getFilteredTransactions() {
-    const query = (els.searchInput.value || "").trim().toLowerCase();
-    const status = els.statusFilter.value;
-    const bank = els.bankFilter.value;
-    const sort = els.sortSelect.value;
-
-    return getSortedTransactions(derived.timeline, sort).filter((tx) => {
-      const matchesQuery = !query || [tx.name, tx.notes, tx.categoryName, tx.bankName].join(" ").toLowerCase().includes(query);
-      const matchesStatus = status === "all" || tx.status === status;
-      const matchesBank = bank === "all" || tx.bank === bank || tx.toBank === bank;
-      return matchesQuery && matchesStatus && matchesBank;
-    });
-  }
-
-  function getSortedTransactions(transactions, sort) {
-    const order = [...transactions];
-    const dateValue = (tx) => new Date(tx.plannedDate || "1970-01-01").getTime();
-
-    order.sort((a, b) => {
-      if (sort === "dateDesc") return dateValue(b) - dateValue(a);
-      if (sort === "amountDesc") return money(b.amount) - money(a.amount);
-      if (sort === "amountAsc") return money(a.amount) - money(b.amount);
-      if (sort === "categoryAsc") return getCategoryName(a.category).localeCompare(getCategoryName(b.category), "ar");
-      if (sort === "statusAsc") return STATUS_LABELS[a.status].localeCompare(STATUS_LABELS[b.status], "ar");
-      return dateValue(a) - dateValue(b);
+    const q = el.searchInput.value.trim().toLowerCase();
+    const status = el.statusFilter.value;
+    const items = data.timeline.filter((tx) => {
+      const matchQ = !q || `${tx.name} ${tx.notes} ${tx.categoryName} ${tx.bankName}`.toLowerCase().includes(q);
+      const matchS = status === "all" || tx.status === status;
+      return matchQ && matchS;
     });
 
-    return order;
+    el.transactionList.innerHTML = items.length ? items.map((tx) => {
+      const signed = signedAmount(tx);
+      const amountClass = tx.type === "Transfer" ? "transfer" : signed >= 0 ? "in" : "out";
+      return `
+        <article class="txCard">
+          <div class="txTop">
+            <div class="txTitle">
+              <h3>${safe(tx.name)}</h3>
+              <div class="badges">
+                <span class="badge ${statusClass(tx.status)}">${STATUSES[tx.status]}</span>
+                <span class="badge">${TYPES[tx.type]}</span>
+                <span class="badge">${tx.categoryName}</span>
+              </div>
+            </div>
+            <div class="amount ${amountClass}">${fmtSigned(signed)}</div>
+          </div>
+
+          <div class="txDetails">
+            <div class="detailBox"><span>البنك</span><strong>${tx.bankName}${tx.toBankName ? ` ← ${tx.toBankName}` : ""}</strong></div>
+            <div class="detailBox"><span>التاريخ</span><strong>${dateFmt(tx.date)}</strong></div>
+            <div class="detailBox"><span>قبل</span><strong>${fmt(tx.before)}</strong></div>
+            <div class="detailBox"><span>بعد</span><strong>${fmt(tx.after)}</strong></div>
+          </div>
+
+          <div class="txActions">
+            <label class="toggle">
+              <input type="checkbox" data-paid="${tx.id}" ${tx.status === "Completed" ? "checked" : ""} />
+              <i></i>
+              <span>مدفوع</span>
+            </label>
+            <button class="btn ghost" type="button" data-edit="${tx.id}">تعديل</button>
+          </div>
+        </article>
+      `;
+    }).join("") : `<div class="empty">لا توجد حركات مطابقة.</div>`;
   }
 
-  function openTransactionEditor(id = "") {
-    const month = getActiveMonth();
-    const tx = id ? month.transactions.find((item) => item.id === id) : null;
-
-    els.transactionDialogTitle.textContent = tx ? "تعديل حركة مالية" : "إضافة حركة مالية";
-    els.transactionId.value = tx?.id || "";
-    els.txName.value = tx?.name || "";
-    els.txAmount.value = tx ? formatInput(tx.amount) : "";
-    els.txType.value = tx?.type || "Expense";
-    els.txBank.value = tx?.bank || "arab";
-    els.txToBank.value = tx?.toBank || "arab";
-    els.txCategory.value = tx?.category || "personal";
-    els.txPlannedDate.value = tx?.plannedDate || `${state.activeMonth}-01`;
-    els.txActualDate.value = tx?.actualDate || "";
-    els.txStatus.value = tx?.status || "Pending";
-    els.txNotes.value = tx?.notes || "";
-    els.deleteTransactionBtn.style.display = tx ? "inline-flex" : "none";
-    syncTypeFields();
-    openDialog("transactionDialog");
+  function openEditor(idValue = "") {
+    const tx = idValue ? active().items.find((item) => item.id === idValue) : null;
+    el.modalTitle.textContent = tx ? "تعديل حركة" : "إضافة حركة";
+    el.txId.value = tx?.id || "";
+    el.txName.value = tx?.name || "";
+    el.txAmount.value = tx ? moneyInput(tx.amount) : "";
+    el.txStatus.value = tx?.status || "Pending";
+    el.txType.value = tx?.type || "Expense";
+    el.txBank.value = tx?.bank || "arab";
+    el.txToBank.value = tx?.toBank || "arab";
+    el.txCategory.value = tx?.category || "personal";
+    el.txDate.value = tx?.date || `${state.activeMonth}-01`;
+    el.txNotes.value = tx?.notes || "";
+    el.deleteBtn.style.display = tx ? "inline-flex" : "none";
+    syncFormType();
+    openDialog(el.txDialog);
   }
 
-  function onTransactionSubmit(event) {
+  function syncFormType() {
+    const transfer = el.txType.value === "Transfer";
+    el.toBankWrap.style.display = transfer ? "grid" : "none";
+    el.txCategory.disabled = transfer;
+    if (transfer) el.txCategory.value = "internal";
+  }
+
+  function saveTransaction(event) {
     event.preventDefault();
-    const month = getActiveMonth();
-    const id = els.transactionId.value;
-    const type = els.txType.value;
-    const bank = els.txBank.value;
-    const toBank = type === "Transfer" ? els.txToBank.value : "";
+    const idValue = el.txId.value;
     const tx = {
-      id: id || `tx_${state.activeMonth.replace("-", "")}_${cryptoSafeId()}`,
-      name: els.txName.value.trim(),
-      amount: Math.abs(money(els.txAmount.value)),
-      bank,
-      toBank,
-      type,
-      category: type === "Transfer" ? "internal" : els.txCategory.value,
-      plannedDate: els.txPlannedDate.value,
-      actualDate: els.txActualDate.value,
-      status: els.txStatus.value,
-      notes: els.txNotes.value.trim()
+      id: idValue || `tx_${state.activeMonth.replace("-", "")}_${id()}`,
+      name: el.txName.value.trim(),
+      amount: Math.abs(num(el.txAmount.value)),
+      status: el.txStatus.value,
+      type: el.txType.value,
+      bank: el.txBank.value,
+      toBank: el.txType.value === "Transfer" ? el.txToBank.value : "",
+      category: el.txType.value === "Transfer" ? "internal" : el.txCategory.value,
+      date: el.txDate.value,
+      actualDate: el.txStatus.value === "Completed" ? today() : "",
+      notes: el.txNotes.value.trim()
     };
 
-    if (!tx.name || !tx.amount || !validDate(tx.plannedDate)) {
-      showToast("راجع اسم الحركة والمبلغ والتاريخ", "لا يمكن حفظ حركة ناقصة");
+    if (!tx.name || !tx.amount || !tx.date) {
+      toast("راجع اسم الحركة والمبلغ والتاريخ");
       return;
     }
 
     if (tx.type === "Transfer" && tx.bank === tx.toBank) {
-      showToast("التحويل غير صحيح", "حساب المصدر والوجهة لا يجب أن يكونا نفس الحساب");
+      toast("التحويل غير صحيح: المصدر والوجهة نفس البنك");
       return;
     }
 
-    if (id) {
-      const index = month.transactions.findIndex((item) => item.id === id);
-      if (index >= 0) month.transactions[index] = tx;
-    } else {
-      month.transactions.push(tx);
-    }
+    const month = active();
+    const i = month.items.findIndex((item) => item.id === idValue);
+    if (i >= 0) month.items[i] = tx;
+    else month.items.push(tx);
 
-    closeDialog("transactionDialog");
-    saveAndRender("تم حفظ الحركة المالية");
+    closeDialog(el.txDialog);
+    saveRender("تم حفظ الحركة");
   }
 
-  async function onDeleteTransaction() {
-    const id = els.transactionId.value;
-    if (!id) return;
-    const ok = await askConfirm("حذف الحركة", "هل تريد حذف هذه الحركة؟ لا يمكن التراجع بعد الحذف.", false);
+  async function deleteCurrentTransaction() {
+    const currentId = el.txId.value;
+    if (!currentId) return;
+    const ok = await confirmBox("حذف الحركة", "هل تريد حذف هذه الحركة؟", false);
+    if (!ok) return;
+    active().items = active().items.filter((item) => item.id !== currentId);
+    closeDialog(el.txDialog);
+    saveRender("تم حذف الحركة");
+  }
+
+  async function resetMonth() {
+    const ok = await confirmBox("تصفير الشهر", "سيتم حذف تعديلات الشهر الحالي وإرجاع الخطة الافتراضية. اكتب RESET للتأكيد.", true);
+    if (!ok) {
+      toast("لم يتم التصفير");
+      return;
+    }
+    state.months[state.activeMonth] = newMonth(state.activeMonth);
+    saveRender("تم تصفير الشهر");
+  }
+
+  async function copyToNextMonth() {
+    const next = nextMonth(state.activeMonth);
+    const ok = await confirmBox("نسخ للشهر القادم", `نسخ خطة ${state.activeMonth} إلى ${next}؟`, false);
     if (!ok) return;
 
-    const month = getActiveMonth();
-    month.transactions = month.transactions.filter((tx) => tx.id !== id);
-    closeDialog("transactionDialog");
-    saveAndRender("تم حذف الحركة");
-  }
+    state.months[next] = {
+      opening: {
+        alrajhi: data.bankStats.alrajhi.expected,
+        arab: data.bankStats.arab.expected,
+        cash: data.bankStats.cash.expected
+      },
+      items: active().items.map((tx) => ({
+        ...tx,
+        id: `tx_${next.replace("-", "")}_${id()}`,
+        date: moveDate(tx.date, next),
+        actualDate: "",
+        status: "Pending"
+      }))
+    };
 
-  function updateTransactionStatus(id, status) {
-    const month = getActiveMonth();
-    const tx = month.transactions.find((item) => item.id === id);
-    if (!tx) return;
-    tx.status = status;
-    if (status === "Completed" && !tx.actualDate) tx.actualDate = new Date().toISOString().slice(0, 10);
-    if (status !== "Completed") tx.actualDate = "";
-    saveAndRender(status === "Completed" ? "تم تحديث الحركة كمكتملة" : "تم إرجاع الحركة إلى معلقة");
-  }
-
-  function syncTypeFields() {
-    const isTransfer = els.txType.value === "Transfer";
-    els.toBankField.style.display = isTransfer ? "grid" : "none";
-    if (isTransfer) {
-      els.txCategory.value = "internal";
-      els.txCategory.disabled = true;
-    } else {
-      els.txCategory.disabled = false;
-    }
+    state.activeMonth = next;
+    saveRender("تم نسخ الشهر");
   }
 
   function exportJson() {
-    const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json;charset=utf-8" });
-    downloadBlob(blob, `cashflow-backup-${state.activeMonth}.json`);
-    showToast("تم إنشاء النسخة الاحتياطية", "ملف JSON جاهز للاستعادة لاحقاً");
+    download(new Blob([JSON.stringify(state, null, 2)], { type: "application/json" }), `cashflow-${state.activeMonth}.json`);
+    toast("تم تصدير نسخة JSON");
   }
 
   async function importJson(event) {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
-
     try {
-      const raw = await file.text();
-      const imported = JSON.parse(raw);
-      if (!imported.months || !imported.preferences) throw new Error("Invalid backup");
-      const ok = await askConfirm("استيراد نسخة احتياطية", "سيتم استبدال البيانات الحالية بالملف المستورد. هل تريد المتابعة؟", false);
+      const parsed = JSON.parse(await file.text());
+      if (!parsed.months) throw new Error("invalid");
+      const ok = await confirmBox("استيراد البيانات", "سيتم استبدال البيانات الحالية. هل تريد المتابعة؟", false);
       if (!ok) return;
-
-      state = imported;
-      state.version = ACTIVE_VERSION;
+      state = parsed;
       if (!state.activeMonth) state.activeMonth = DEFAULT_MONTH;
-      if (!state.preferences) state.preferences = { theme: "dark", accent: "#099999", onboardingSeen: true };
-      Object.keys(state.months).forEach((key) => normalizeMonth(state.months[key], key));
-      applyPreferences();
-      saveAndRender("تم استيراد النسخة الاحتياطية");
+      if (!state.theme) state.theme = "dark";
+      ensureMonth(state.activeMonth);
+      saveRender("تم الاستيراد");
     } catch {
-      showToast("فشل الاستيراد", "ملف JSON غير صالح أو غير متوافق");
+      toast("ملف غير صالح");
     }
   }
 
   function exportCsv() {
     const rows = [
-      ["الشهر", "الحالة", "الحركة", "النوع", "البنك", "إلى بنك", "التصنيف", "المبلغ", "التاريخ المخطط", "التاريخ الفعلي", "الرصيد قبل", "الرصيد بعد", "ملاحظات"],
-      ...derived.timeline.map((tx) => [
+      ["الشهر", "الحركة", "النوع", "البنك", "إلى بنك", "التصنيف", "المبلغ", "الحالة", "التاريخ", "الرصيد قبل", "الرصيد بعد", "ملاحظة"],
+      ...data.timeline.map((tx) => [
         state.activeMonth,
-        STATUS_LABELS[tx.status],
         tx.name,
-        TYPE_LABELS[tx.type],
+        TYPES[tx.type],
         tx.bankName,
-        tx.toBankName || "",
+        tx.toBankName,
         tx.categoryName,
-        money(tx.amount).toFixed(3),
-        tx.plannedDate,
-        tx.actualDate || "",
-        money(tx.plannedBefore).toFixed(3),
-        money(tx.plannedAfter).toFixed(3),
-        tx.notes || ""
+        tx.amount.toFixed(3),
+        STATUSES[tx.status],
+        tx.date,
+        tx.before.toFixed(3),
+        tx.after.toFixed(3),
+        tx.notes
       ])
     ];
-
-    const csv = "\ufeff" + rows.map((row) => row.map(csvCell).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    downloadBlob(blob, `cashflow-report-${state.activeMonth}.csv`);
-    showToast("تم تصدير ملف Excel", "الملف بصيغة CSV متوافقة مع Excel");
+    const csv = "\ufeff" + rows.map((row) => row.map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
+    download(new Blob([csv], { type: "text/csv;charset=utf-8" }), `cashflow-${state.activeMonth}.csv`);
+    toast("تم تصدير ملف Excel");
   }
 
-  async function resetMonth() {
-    const ok = await askConfirm("تصفير الشهر", "سيتم حذف كل تعديلات الشهر الحالي وإرجاع الخطة الافتراضية. اكتب RESET للتأكيد.", true);
-    if (!ok) {
-      showToast("لم يتم التصفير", "لم يتم إدخال كلمة التأكيد الصحيحة");
-      return;
-    }
-
-    state.months[state.activeMonth] = createDefaultMonth(state.activeMonth);
-    saveAndRender("تم تصفير الشهر الحالي");
-  }
-
-  async function duplicateToNextMonth() {
-    const current = state.activeMonth;
-    const next = nextMonth(current);
-    const ok = await askConfirm("نسخ للشهر القادم", `سيتم نسخ خطة ${current} إلى ${next}. هل تريد المتابعة؟`, false);
-    if (!ok) return;
-
-    const currentMonth = getActiveMonth();
-    state.months[next] = {
-      openingBalances: { ...derived.plannedBalances },
-      transactions: currentMonth.transactions.map((tx) => ({
-        ...tx,
-        id: `tx_${next.replace("-", "")}_${cryptoSafeId()}`,
-        plannedDate: shiftDateMonth(tx.plannedDate, next),
-        actualDate: "",
-        status: "Pending"
-      })),
-      closingChecklist: MONTHLY_CLOSING_ITEMS.map(() => false)
-    };
-    state.activeMonth = next;
-    saveAndRender("تم نسخ الخطة للشهر القادم");
-  }
-
-  function askConfirm(title, message, requireResetPhrase) {
-    els.confirmTitle.textContent = title;
-    els.confirmMessage.textContent = message;
-    els.confirmInputWrap.classList.toggle("is-visible", Boolean(requireResetPhrase));
-    els.confirmInput.value = "";
-    openDialog("confirmDialog");
+  function confirmBox(title, text, phrase) {
+    el.confirmTitle.textContent = title;
+    el.confirmText.textContent = text;
+    el.confirmPhraseWrap.classList.toggle("hidden", !phrase);
+    el.confirmPhrase.value = "";
+    openDialog(el.confirmDialog);
     return new Promise((resolve) => {
-      confirmResolver = resolve;
+      confirmResolve = resolve;
     });
   }
 
-  function openDialog(id) {
-    const dialog = document.getElementById(id);
-    if (!dialog) return;
-    if (typeof dialog.showModal === "function") dialog.showModal();
-    else dialog.setAttribute("open", "open");
-  }
-
-  function closeDialog(id) {
-    const dialog = document.getElementById(id);
-    if (!dialog) return;
-    if (typeof dialog.close === "function") dialog.close();
-    else dialog.removeAttribute("open");
-  }
-
-  function showToast(title, message = "") {
-    const toast = document.createElement("div");
-    toast.className = "toast";
-    toast.innerHTML = `<strong>${escapeHtml(title)}</strong>${message ? `<small>${escapeHtml(message)}</small>` : ""}`;
-    els.toastHost.appendChild(toast);
-    window.setTimeout(() => {
-      toast.style.opacity = "0";
-      toast.style.transform = "translateY(8px)";
-      window.setTimeout(() => toast.remove(), 280);
-    }, 2600);
-  }
-
-  function buildBalancePoints(timeline) {
-    const opening = getActiveMonth().openingBalances;
-    const points = [{
-      label: "Opening",
-      alrajhi: opening.alrajhi,
-      arab: opening.arab,
-      cash: opening.cash
-    }];
-
-    timeline.forEach((tx) => {
-      const last = { ...points[points.length - 1] };
-      const amount = money(tx.amount);
-
-      if (tx.status !== "Skipped") {
-        if (tx.type === "Transfer") {
-          last[tx.bank] -= amount;
-          if (tx.toBank) last[tx.toBank] += amount;
-        } else if (tx.type === "Income" || tx.type === "Reimbursement") {
-          last[tx.bank] += amount;
-        } else if (isExpenseLike(tx.type)) {
-          last[tx.bank] -= amount;
-        }
-      }
-
-      points.push(last);
-    });
-
-    return points;
-  }
-
-  function calculateHealthScore(data) {
-    let score = 100;
-    if (Math.abs(data.plannedFinalRemaining) > 0.0005) score -= 20;
-    score -= Math.min(25, data.delayedCount * 5);
-    if (data.totalRealExpenses > 0 && data.pendingExpenses / data.totalRealExpenses > 0.6) score -= 10;
-    score += Math.round(data.completionByExpense * 10);
-    return clamp(Math.round(score), 0, 100);
-  }
-
-  function calculatePressure(expenses, income) {
-    const ratio = income ? expenses / income : 0;
-    if (ratio >= 1) return { label: "مرتفع", ratio };
-    if (ratio >= 0.75) return { label: "متوسط", ratio };
-    return { label: "منخفض", ratio };
-  }
-
-  function isExpenseLike(type) {
+  function isExpense(type) {
     return ["Expense", "Deduction", "DebtRepayment"].includes(type);
   }
 
   function signedAmount(tx) {
-    const amount = money(tx.amount);
-    if (tx.type === "Income" || tx.type === "Reimbursement") return amount;
-    if (tx.type === "Transfer" || isExpenseLike(tx.type)) return -amount;
+    if (tx.type === "Income" || tx.type === "Reimbursement") return tx.amount;
+    if (tx.type === "Transfer" || isExpense(tx.type)) return -tx.amount;
     return 0;
   }
 
-  function isPastDue(tx) {
-    if (!tx.plannedDate || tx.status === "Completed" || tx.status === "Skipped") return false;
-    const today = new Date().toISOString().slice(0, 10);
-    return tx.plannedDate < today;
+  function statusClass(status) {
+    if (status === "Completed") return "done";
+    if (status === "Delayed") return "delayed";
+    if (status === "Pending") return "pending";
+    return "";
   }
 
-  function getCategoryName(id) {
-    return CATEGORY_DEFS.find((cat) => cat.id === id)?.name || "غير مصنف";
+  function catName(idValue) {
+    return CATEGORIES.find((cat) => cat.id === idValue)?.name || "غير مصنف";
   }
 
   function fmt(value) {
-    return `${money(value).toLocaleString("en-US", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} JOD`;
+    return `${num(value).toLocaleString("en-US", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} JOD`;
+  }
+
+  function shortFmt(value) {
+    return num(value).toLocaleString("en-US", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
   }
 
   function fmtSigned(value) {
-    const numeric = money(value);
-    const sign = numeric > 0 ? "+" : numeric < 0 ? "-" : "";
-    return `${sign}${Math.abs(numeric).toLocaleString("en-US", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} JOD`;
-  }
-
-  function formatInput(value) {
-    return money(value).toFixed(3);
+    const n = num(value);
+    const sign = n > 0 ? "+" : n < 0 ? "-" : "";
+    return `${sign}${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} JOD`;
   }
 
   function pct(value) {
-    return `${clamp(value * 100, 0, 999).toFixed(1)}%`;
+    return `${Math.max(0, Math.min(999, value * 100)).toFixed(0)}%`;
   }
 
-  function money(value) {
-    const parsed = Number.parseFloat(String(value ?? "").replace(/,/g, ""));
-    return Number.isFinite(parsed) ? Math.round(parsed * 1000000) / 1000000 : 0;
+  function moneyInput(value) {
+    return num(value).toFixed(3);
   }
 
-  function sum(values) {
-    return values.reduce((total, value) => total + money(value), 0);
+  function num(value) {
+    const n = Number.parseFloat(String(value ?? "").replace(/,/g, ""));
+    return Number.isFinite(n) ? Math.round(n * 1000000) / 1000000 : 0;
   }
 
-  function clamp(value, min, max) {
-    return Math.min(max, Math.max(min, value));
+  function dateFmt(value) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value || "")) return "—";
+    const [y, m, d] = value.split("-");
+    return `${d}/${m}/${y}`;
   }
 
-  function formatDate(value) {
-    if (!validDate(value)) return "—";
-    const [year, month, day] = value.split("-");
-    return `${day}/${month}/${year}`;
+  function nextMonth(month) {
+    const [y, m] = month.split("-").map(Number);
+    const d = new Date(y, m, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   }
 
-  function validDate(value) {
-    return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
+  function moveDate(date, month) {
+    const day = String(date || "").slice(-2) || "01";
+    const [y, m] = month.split("-").map(Number);
+    const last = new Date(y, m, 0).getDate();
+    return `${month}-${String(Math.min(Number(day), last)).padStart(2, "0")}`;
   }
 
-  function nextMonth(monthKey) {
-    const [year, month] = monthKey.split("-").map(Number);
-    const date = new Date(year, month, 1);
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+  function today() {
+    return new Date().toISOString().slice(0, 10);
   }
 
-  function shiftDateMonth(dateValue, targetMonth) {
-    if (!validDate(dateValue)) return `${targetMonth}-01`;
-    const day = dateValue.slice(-2);
-    const [year, month] = targetMonth.split("-").map(Number);
-    const lastDay = new Date(year, month, 0).getDate();
-    return `${targetMonth}-${String(Math.min(Number(day), lastDay)).padStart(2, "0")}`;
-  }
-
-  function amountClass(value) {
-    const numeric = money(value);
-    if (numeric > 0) return "amount-positive";
-    if (numeric < 0) return "amount-negative";
-    return "amount-neutral";
-  }
-
-  function csvCell(value) {
-    return `"${String(value ?? "").replace(/"/g, '""')}"`;
-  }
-
-  function downloadBlob(blob, filename) {
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = filename;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    URL.revokeObjectURL(url);
-  }
-
-  function hexToRgb(hex) {
-    const normalized = String(hex || "#099999").replace("#", "");
-    const full = normalized.length === 3
-      ? normalized.split("").map((char) => char + char).join("")
-      : normalized.padEnd(6, "0").slice(0, 6);
-    const int = Number.parseInt(full, 16);
-    const r = (int >> 16) & 255;
-    const g = (int >> 8) & 255;
-    const b = int & 255;
-    return `${r}, ${g}, ${b}`;
-  }
-
-  function cryptoSafeId() {
-    if (window.crypto?.getRandomValues) {
-      const arr = new Uint32Array(1);
-      window.crypto.getRandomValues(arr);
-      return arr[0].toString(36);
-    }
+  function id() {
     return Math.random().toString(36).slice(2, 10);
   }
 
-  function escapeHtml(value) {
+  function safe(value) {
     return String(value ?? "")
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#039;");
+  }
+
+  function download(blob, name) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function openDialog(dialog) {
+    if (typeof dialog.showModal === "function") dialog.showModal();
+    else dialog.setAttribute("open", "open");
+  }
+
+  function closeDialog(dialog) {
+    if (typeof dialog.close === "function") dialog.close();
+    else dialog.removeAttribute("open");
+  }
+
+  function toast(message) {
+    el.toast.textContent = message;
+    el.toast.classList.add("show");
+    clearTimeout(toast.timer);
+    toast.timer = setTimeout(() => el.toast.classList.remove("show"), 2400);
   }
 })();
