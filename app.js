@@ -181,6 +181,9 @@
       if (!tx) return;
       tx.status = paid.checked ? "Completed" : "Pending";
       tx.actualDate = paid.checked ? today() : "";
+      if (paid.checked && el.statusFilter.value !== "all") {
+        el.statusFilter.value = "all";
+      }
       saveRender(paid.checked ? "تم تسجيلها كمدفوعة" : "تم إرجاعها لغير مدفوعة");
     });
 
@@ -654,11 +657,11 @@
         tx.bankName,
         tx.toBankName,
         tx.categoryName,
-        tx.amount.toFixed(3),
+        String(displayInt(tx.amount)),
         STATUSES[tx.status],
         tx.date,
-        tx.before.toFixed(3),
-        tx.after.toFixed(3),
+        String(displayInt(tx.before)),
+        String(displayInt(tx.after)),
         tx.notes
       ])
     ];
@@ -699,18 +702,22 @@
     return CATEGORIES.find((cat) => cat.id === idValue)?.name || "غير مصنف";
   }
 
+  function displayInt(value) {
+    return Math.round(num(value));
+  }
+
   function fmt(value) {
-    return `${num(value).toLocaleString("en-US", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} JOD`;
+    return `${displayInt(value).toLocaleString("en-US", { maximumFractionDigits: 0 })} JOD`;
   }
 
   function shortFmt(value) {
-    return num(value).toLocaleString("en-US", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+    return displayInt(value).toLocaleString("en-US", { maximumFractionDigits: 0 });
   }
 
   function fmtSigned(value) {
-    const n = num(value);
+    const n = displayInt(value);
     const sign = n > 0 ? "+" : n < 0 ? "-" : "";
-    return `${sign}${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} JOD`;
+    return `${sign}${Math.abs(n).toLocaleString("en-US", { maximumFractionDigits: 0 })} JOD`;
   }
 
   function pct(value) {
@@ -718,7 +725,7 @@
   }
 
   function moneyInput(value) {
-    return num(value).toFixed(3);
+    return String(displayInt(value));
   }
 
   function num(value) {

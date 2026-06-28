@@ -862,3 +862,60 @@ button {
     break-inside: avoid;
   }
 }
+
+
+/* v3 simplification fixes */
+.transactionsSectionCard {
+  margin-top: 14px;
+  overflow: hidden;
+}
+
+.transactionsHeader {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: stretch;
+  padding-inline-end: 12px;
+}
+
+.transactionsHeader .sectionToggle {
+  padding-inline-end: 17px;
+}
+
+.addTransactionBtn {
+  align-self: center;
+}
+
+.transactionsPanel {
+  padding-top: 0;
+}
+
+.transactionsPanel.open {
+  display: block;
+}
+
+@media (max-width: 620px) {
+  html,
+  body,
+  .app,
+  .mainBalanceCard,
+  .sectionCard,
+  .bankCard,
+  .categoryCard,
+  .txCard,
+  .modal,
+  .modalBox {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .transactionsHeader {
+    grid-template-columns: 1fr;
+    padding: 0;
+  }
+
+  .transactionsHeader .sectionToggle,
+  .addTransactionBtn {
+    width: 100%;
+  }
+}
