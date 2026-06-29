@@ -1,333 +1,107 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl" data-theme="dark">
+<html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="description" content="نظام مالي شخصي بسيط لتتبع الراتب، البنوك، المصروفات، والمتبقي الشهري." />
-  <meta name="theme-color" content="#07111f" />
-  <title>متابعة الراتب الشهرية — v5</title>
+  <meta name="description" content="Typeform-style personal finance flow for monthly cash movement tracking." />
+  <meta name="theme-color" content="#f4fbfb" />
+  <title>متابعة الحركات المالية</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <main class="app">
-    <header class="hero">
-      <div class="heroText">
-        <span class="tag">Cashflow v5</span>
-        <h1>متابعة الراتب الشهرية</h1>
-        <p>كل حركة واضحة: مدفوعة، متأخرة، متكررة، أو متبقية. بدون تعقيد.</p>
+  <main class="appShell">
+    <header class="topBar shellCard">
+      <div class="brandBlock">
+        <span class="eyebrow">Cashflow Flow</span>
+        <h1>متابعة الحركات المالية</h1>
+        <p>امشِ حركة حركة، عدّل المبلغ، أكّد، تخطَّ، أو اشطب. وفي النهاية خذ تقرير واضح.</p>
       </div>
 
-      <div class="heroControls">
-        <label class="field compact">
+      <div class="topActions">
+        <label class="field compactField">
           <span>الشهر</span>
           <input id="monthInput" type="month" />
         </label>
-        <button id="themeBtn" class="btn ghost" type="button">فاتح</button>
+        <button id="resetMonthBtn" class="btn subtle" type="button">تصفير الشهر</button>
       </div>
     </header>
 
-    <section class="mainBalanceCard">
-      <div>
-        <span>المتبقي النهائي المتوقع</span>
-        <strong id="expectedRemaining">0 JOD</strong>
-        <small id="balanceExplain">بعد كل الحركات المخططة</small>
-      </div>
-      <div class="scoreRing" id="scoreRing">
-        <b id="monthScore">0</b>
-        <small>Score</small>
-      </div>
-    </section>
-
-    <section class="quickStats" id="quickStats"></section>
-    <section id="actionCards" class="actionCards"></section>
-
-    <section class="simpleFlow" aria-label="مسار الراتب">
-      <div class="flowItem">
-        <span>دخل</span>
-        <strong id="flowIncome">0.000</strong>
-      </div>
-      <div class="flowArrow">←</div>
-      <div class="flowItem">
-        <span>تحويلات</span>
-        <strong id="flowTransfers">0.000</strong>
-      </div>
-      <div class="flowArrow">←</div>
-      <div class="flowItem">
-        <span>مصروفات</span>
-        <strong id="flowExpenses">0.000</strong>
-      </div>
-      <div class="flowArrow">←</div>
-      <div class="flowItem result">
-        <span>متبقي</span>
-        <strong id="flowRemaining">0.000</strong>
-      </div>
-    </section>
-
-    <section class="sectionCard statusBoard">
-      <div class="boardItem"><span>مقارنة بالشهر السابق</span><strong id="monthComparison">—</strong></div>
-      <div class="boardItem"><span>الرصيد الفعلي المدخل</span><strong id="actualBalanceTotal">—</strong></div>
-      <div class="boardItem"><span>فرق الرصيد</span><strong id="balanceMismatch">—</strong></div>
-    </section>
-
-    <section class="sectionCard">
-      <button class="sectionToggle" type="button" data-toggle="openingPanel">
-        <span>
-          <b>الأرصدة الافتتاحية والفعلية</b>
-          <small>رصيد بداية الشهر + الرصيد الفعلي من البنك</small>
-        </span>
-        <i>+</i>
-      </button>
-
-      <div id="openingPanel" class="collapsible">
-        <div class="formGrid">
-          <label class="field">
-            <span>الراجحي</span>
-            <input class="openingInput" data-bank="alrajhi" type="number" step="1" inputmode="numeric" />
-          </label>
-          <label class="field">
-            <span>العربي</span>
-            <input class="openingInput" data-bank="arab" type="number" step="1" inputmode="numeric" />
-          </label>
-          <label class="field">
-            <span>نقدي</span>
-            <input class="openingInput" data-bank="cash" type="number" step="1" inputmode="numeric" />
-          </label>
-          <label class="field"><span>فعلي الراجحي</span><input class="actualInput" data-bank="alrajhi" type="number" step="1" inputmode="numeric" /></label>
-          <label class="field"><span>فعلي العربي</span><input class="actualInput" data-bank="arab" type="number" step="1" inputmode="numeric" /></label>
-          <label class="field"><span>فعلي نقدي</span><input class="actualInput" data-bank="cash" type="number" step="1" inputmode="numeric" /></label>
+    <section class="setupCard shellCard">
+      <div class="sectionHead">
+        <div>
+          <span class="eyebrow">Opening Balances</span>
+          <h2>الأرصدة الافتتاحية</h2>
         </div>
+        <button id="toggleSetupBtn" class="btn ghost smallBtn" type="button">طي / فتح</button>
+      </div>
+
+      <div id="setupPanel" class="setupGrid">
+        <label class="field">
+          <span>الراجحي</span>
+          <input class="openingInput" data-bank="alrajhi" type="number" step="1" inputmode="numeric" />
+        </label>
+        <label class="field">
+          <span>العربي</span>
+          <input class="openingInput" data-bank="arab" type="number" step="1" inputmode="numeric" />
+        </label>
+        <label class="field">
+          <span>نقدي</span>
+          <input class="openingInput" data-bank="cash" type="number" step="1" inputmode="numeric" />
+        </label>
       </div>
     </section>
 
-    <section class="sectionTitle">
-      <div>
-        <span class="tag">Banks</span>
-        <h2>أرصدة البنوك</h2>
+    <section class="progressCard shellCard">
+      <div class="progressHead">
+        <div>
+          <span class="eyebrow">Progress</span>
+          <h2 id="progressTitle">الحركة 1 من 1</h2>
+        </div>
+        <strong id="progressValue">0%</strong>
       </div>
+      <div class="progressTrack"><span id="progressFill"></span></div>
+      <p id="progressHint">ابدأ بمراجعة الحركة الحالية.</p>
     </section>
-    <section id="bankCards" class="bankCards"></section>
 
-    <section class="sectionTitle">
-      <div>
-        <span class="tag">Categories</span>
-        <h2>التصنيفات</h2>
-      </div>
+    <section id="flowView" class="flowView">
+      <article id="flowCard" class="flowCard shellCard"></article>
     </section>
-    <section id="categoryCards" class="categoryCards"></section>
 
-    <section class="sectionCard transactionsSectionCard">
-      <div class="transactionsHeader">
-        <button class="sectionToggle transactionsToggle" type="button" data-toggle="transactionsPanel">
-          <span>
-            <b>الحركات المالية</b>
-            <small id="transactionsHint">اضغط للطي أو الفتح</small>
-          </span>
-          <i>−</i>
-        </button>
-        <button id="addBtn" class="btn primary addTransactionBtn" type="button">إضافة</button>
+    <section id="reportView" class="reportView hidden">
+      <div class="reportHero shellCard">
+        <span class="eyebrow">Monthly Report</span>
+        <h2>تم الانتهاء من كل الحركات</h2>
+        <p>هذا ملخص الشهر، مع قائمة الحركات التي تم تخطيها حتى ترجع لها لاحقاً.</p>
       </div>
 
-      <div id="transactionsPanel" class="collapsible open transactionsPanel">
-        <section class="filters">
-          <label class="field searchField">
-            <span>بحث</span>
-            <input id="searchInput" type="search" placeholder="اسم الحركة..." />
-          </label>
-          <div class="field statusFilterField">
-            <span>الحالة</span>
-            <select id="statusFilter" class="visuallyHiddenSelect" aria-label="فلتر الحالة">
-              <option value="all">الكل</option>
-              <option value="Pending">غير مدفوع</option>
-              <option value="Completed">مدفوع</option>
-              <option value="Delayed">متأخر</option>
-              <option value="Skipped">متجاوز</option>
-            </select>
-            <div class="statusPills" role="tablist" aria-label="فلتر الحالة">
-              <button class="statusPill active" type="button" data-status-filter="all">الكل</button>
-              <button class="statusPill pending" type="button" data-status-filter="Pending">غير مدفوع</button>
-              <button class="statusPill done" type="button" data-status-filter="Completed">مدفوع</button>
-              <button class="statusPill delayed" type="button" data-status-filter="Delayed">متأخر</button>
-              <button class="statusPill skipped" type="button" data-status-filter="Skipped">متجاوز</button>
+      <div id="reportStats" class="reportStats"></div>
+
+      <div class="reportGrid">
+        <article class="reportPanel shellCard">
+          <div class="sectionHead">
+            <div>
+              <span class="eyebrow">Skipped</span>
+              <h3>الحركات المتخطاة</h3>
+            </div>
+            <button id="reopenAllSkippedBtn" class="btn subtle smallBtn" type="button">إرجاع الكل للمراجعة</button>
+          </div>
+          <div id="skippedList" class="listStack"></div>
+        </article>
+
+        <article class="reportPanel shellCard">
+          <div class="sectionHead">
+            <div>
+              <span class="eyebrow">Confirmed</span>
+              <h3>الحركات المؤكدة</h3>
             </div>
           </div>
-          <label class="field"><span>البنك</span><select id="bankFilter"><option value="all">كل البنوك</option><option value="alrajhi">الراجحي</option><option value="arab">العربي</option><option value="cash">نقدي</option></select></label>
-          <label class="field"><span>التصنيف</span><select id="categoryFilter"><option value="all">كل التصنيفات</option></select></label>
-          <label class="field"><span>النوع</span><select id="typeFilter"><option value="all">كل الأنواع</option><option value="Income">دخل</option><option value="Expense">مصروف</option><option value="Transfer">تحويل</option><option value="Deduction">اقتطاع</option><option value="Reimbursement">تعويض</option><option value="DebtRepayment">سداد دين</option></select></label>
-          <label class="field"><span>الترتيب</span><select id="sortSelect"><option value="dateAsc">التاريخ تصاعدي</option><option value="dateDesc">التاريخ تنازلي</option><option value="amountDesc">المبلغ الأعلى</option><option value="amountAsc">المبلغ الأقل</option><option value="priority">الأولوية</option></select></label>
-        </section>
-
-        <section class="bulkBar">
-          <label class="toggle miniToggle"><input id="hideCompletedToggle" type="checkbox" /><i></i><span>إخفاء المدفوع</span></label>
-          <button id="pendingOnlyBtn" class="btn ghost" type="button">غير المدفوع فقط</button>
-          <button id="quickPayTodayBtn" class="btn ghost" type="button">دفع مستحقات اليوم</button>
-          <button id="bulkPayBtn" class="btn ghost" type="button">دفع المحدد</button>
-          <button id="bulkDeleteBtn" class="btn danger" type="button">حذف المحدد</button>
-        </section>
-
-        <section id="transactionList" class="transactionList"></section>
+          <div id="confirmedList" class="listStack"></div>
+        </article>
       </div>
     </section>
 
-    <section class="sectionCard">
-      <button class="sectionToggle" type="button" data-toggle="analyticsPanel">
-        <span><b>تحليل سريع</b><small>رسوم بسيطة بدون تعقيد</small></span>
-        <i>+</i>
-      </button>
-      <div id="analyticsPanel" class="collapsible">
-        <div class="chartsGrid">
-          <article class="miniChart"><h3>المصروفات حسب التصنيف</h3><div id="categoryChart"></div></article>
-          <article class="miniChart"><h3>مدفوع مقابل غير مدفوع</h3><div id="paidChart"></div></article>
-          <article class="miniChart"><h3>أعلى 5 مصروفات</h3><div id="topChart"></div></article>
-          <article class="miniChart"><h3>آخر 5 حركات</h3><div id="lastFiveList"></div></article>
-        </div>
-      </div>
-    </section>
-
-    <section class="sectionCard toolsCard">
-      <button class="sectionToggle" type="button" data-toggle="toolsPanel">
-        <span>
-          <b>أدوات الشهر</b>
-          <small>إغلاق، أرشفة، تصدير، حماية، وملاحظات</small>
-        </span>
-        <i>+</i>
-      </button>
-
-      <div id="toolsPanel" class="collapsible">
-        <div class="toolsGrid">
-          <button id="closeMonthBtn" class="btn ghost" type="button">إغلاق الشهر</button>
-          <button id="unlockMonthBtn" class="btn ghost" type="button">فك الإغلاق</button>
-          <button id="copyNextBtn" class="btn ghost" type="button">نسخ للشهر القادم</button>
-          <button id="exportBtn" class="btn ghost" type="button">تصدير JSON</button>
-          <button id="importBtn" class="btn ghost" type="button">استيراد JSON</button>
-          <button id="csvBtn" class="btn ghost" type="button">تصدير Excel</button>
-          <button id="printBtn" class="btn ghost" type="button">تقرير PDF</button>
-          <button id="undoBtn" class="btn ghost" type="button">استعادة آخر تعديل</button>
-          <button id="readOnlyBtn" class="btn ghost" type="button">وضع قراءة فقط</button>
-          <button id="compactBtn" class="btn ghost" type="button">Dashboard موبايل مختصر</button>
-          <button id="setPasswordBtn" class="btn ghost" type="button">كلمة سر Reset</button>
-          <button id="resetBtn" class="btn danger" type="button">تصفير الشهر</button>
-        </div>
-        <label class="field monthNote"><span>ملاحظات الشهر</span><textarea id="monthNotes" rows="4" placeholder="اكتب ملاحظات عامة لهذا الشهر..."></textarea></label>
-      </div>
-    </section>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
   </main>
-
-  <button id="fabBtn" class="fab" type="button" aria-label="إضافة حركة">+</button>
-  <input id="importFile" type="file" accept="application/json" hidden />
-
-  <dialog id="txDialog" class="modal">
-    <form id="txForm" class="modalBox" method="dialog">
-      <div class="modalHead">
-        <div>
-          <span class="tag">Transaction</span>
-          <h3 id="modalTitle">إضافة حركة</h3>
-        </div>
-        <button class="iconBtn" type="button" data-close>×</button>
-      </div>
-
-      <input id="txId" type="hidden" />
-
-      <div class="formGrid">
-        <label class="field full">
-          <span>اسم الحركة</span>
-          <input id="txName" type="text" required />
-        </label>
-
-        <label class="field">
-          <span>المبلغ</span>
-          <input id="txAmount" type="number" step="1" inputmode="numeric" required />
-        </label>
-
-        <label class="field">
-          <span>الحالة</span>
-          <select id="txStatus">
-            <option value="Pending">غير مدفوع</option>
-            <option value="Completed">مدفوع</option>
-            <option value="Delayed">متأخر</option>
-            <option value="Skipped">متجاوز</option>
-          </select>
-        </label>
-
-        <label class="field">
-          <span>النوع</span>
-          <select id="txType">
-            <option value="Income">دخل</option>
-            <option value="Expense">مصروف</option>
-            <option value="Transfer">تحويل داخلي</option>
-            <option value="Deduction">اقتطاع</option>
-            <option value="Reimbursement">تعويض</option>
-            <option value="DebtRepayment">سداد دين</option>
-          </select>
-        </label>
-
-        <label class="field">
-          <span>من بنك</span>
-          <select id="txBank">
-            <option value="alrajhi">الراجحي</option>
-            <option value="arab">العربي</option>
-            <option value="cash">نقدي</option>
-          </select>
-        </label>
-
-        <label id="toBankWrap" class="field">
-          <span>إلى بنك</span>
-          <select id="txToBank">
-            <option value="arab">العربي</option>
-            <option value="alrajhi">الراجحي</option>
-            <option value="cash">نقدي</option>
-          </select>
-        </label>
-
-        <label class="field">
-          <span>التصنيف</span>
-          <select id="txCategory"></select>
-        </label>
-
-        <label class="field">
-          <span>التاريخ</span>
-          <input id="txDate" type="date" required />
-        </label>
-
-        <label class="field"><span>الأولوية</span><select id="txPriority"><option value="high">عالية</option><option value="medium">متوسطة</option><option value="low">منخفضة</option></select></label>
-        <label class="field"><span>رقم مرجعي</span><input id="txReference" type="text" placeholder="اختياري" /></label>
-        <label class="field checkField"><input id="txEssential" type="checkbox" /><span>حركة أساسية</span></label>
-        <label class="field checkField"><input id="txRecurring" type="checkbox" /><span>تكرار شهري</span></label>
-        <label class="field"><span>يوم التكرار</span><input id="txRecurringDay" type="number" min="1" max="31" step="1" /></label>
-        <label class="field"><span>تكرار حتى</span><input id="txRecurringUntil" type="month" /></label>
-        <label class="field checkField"><input id="txRecurringPaused" type="checkbox" /><span>إيقاف التكرار مؤقتاً</span></label>
-        <label class="field full"><span>إيصال / مرفق</span><input id="txReceipt" type="file" accept="image/*,.pdf" /></label>
-        <label class="field full">
-          <span>ملاحظة</span>
-          <textarea id="txNotes" rows="3"></textarea>
-        </label>
-      </div>
-
-      <div id="txLog" class="changeLog"></div>
-
-      <div class="modalActions">
-        <button id="deleteBtn" class="btn danger" type="button">حذف</button>
-        <button class="btn ghost" type="button" data-close>إلغاء</button>
-        <button class="btn primary" type="submit">حفظ</button>
-      </div>
-    </form>
-  </dialog>
-
-  <dialog id="confirmDialog" class="modal smallModal">
-    <form class="modalBox" method="dialog">
-      <h3 id="confirmTitle">تأكيد</h3>
-      <p id="confirmText"></p>
-      <label id="confirmPhraseWrap" class="field hidden">
-        <span id="confirmPhraseLabel">اكتب RESET</span>
-        <input id="confirmPhrase" type="text" autocomplete="off" />
-      </label>
-      <div class="modalActions">
-        <button class="btn ghost" value="cancel" type="submit">إلغاء</button>
-        <button class="btn danger" value="ok" type="submit">تأكيد</button>
-      </div>
-    </form>
-  </dialog>
-
-  <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <script src="app.js"></script>
 </body>
